@@ -1,0 +1,315 @@
+import { Worker } from 'worker_threads'
+import path from 'path'
+import fs from 'fs'
+import { randomUUID } from 'crypto'
+import { dialog, ipcMain, type BrowserWindow } from 'electron'
+import { fileURLToPath } from 'url'
+import { MAX_FILE_BYTES } from '../shared/constants'
+import { detectFormat, parseHeaders } from '../shared/formatDetection'
+import { normalizeHeaderLine } from '../shared/csv'
+import type {
+  FileMetadata,
+  RowRange,
+  RowData,
+  SearchRequest,
+  SearchResult,
+  TagUpdate,
+  SaveTagsRequest,
+  IndexProgressEvent
+} from '../shared/types'
+import { deleteSession, getSession, setSession } from './fileSession'
+import { readRows } from './fileReader'
+import { loadTags, saveTags } from './tagStore'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+
+function workerPath(name: string): string {
+  return path.join(__dirname, name)
+}
+
+function sendProgress(mainWindow: BrowserWindow, event: IndexProgressEvent): void {
+  mainWindow.webContents.send('file:index-progress', event)
+}
+
+function readFirstLine(filePath: string): string {
+  const fd = fs.openSync(filePath, 'r')
+  try {
+    const buffer = Buffer.alloc(65536)
+    const { bytesRead } = fs.readSync(fd, buffer, 0, buffer.length, 0)
+    const text = buffer.subarray(0, bytesRead).toString('utf8')
+    const newlineIndex = text.indexOf('\n')
+    if (newlineIndex < 0) {
+      return text.replace(/\r$/, '')
+    }
+    return text.slice(0, newlineIndex)
+  } finally {
+    fs.closeSync(fd)
+  }
+}
+
+async function indexFile(
+  filePath: string,
+  fileId: string,
+  mainWindow: BrowserWindow
+): Promise<{ offsets: BigInt64Array; rowCount: number }> {
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(workerPath('fileIndexer.js'), {
+      workerData: { filePath, fileId }
+    })
+
+    worker.on('message', (message: { type: string }) => {
+      if (message.type === 'progress') {
+        const progress = message as { fileId: string; linesIndexed: number }
+        sendProgress(mainWindow, {
+          fileId: progress.fileId,
+          linesIndexed: progress.linesIndexed,
+          phase: 'indexing'
+        })
+      } else if (message.type === 'complete') {
+        const complete = message as {
+          offsetsBuffer: ArrayBuffer
+          rowCount: number
+        }
+        const offsets = new BigInt64Array(complete.offsetsBuffer)
+        resolve({ offsets, rowCount: complete.rowCount })
+      } else if (message.type === 'error') {
+        reject(new Error((message as { message: string }).message))
+      }
+    })
+
+    worker.on('error', reject)
+    worker.on('exit', (code) => {
+      if (code !== 0) {
+        reject(new Error(`Indexer worker exited with code ${code}`))
+      }
+    })
+  })
+}
+
+async function openFileAtPath(
+  filePath: string,
+  mainWindow: BrowserWindow
+): Promise<FileMetadata> {
+  if (!fs.existsSync(filePath)) {
+    throw new Error(`File not found: ${filePath}`)
+  }
+
+  const stats = fs.statSync(filePath)
+  if (stats.size > MAX_FILE_BYTES) {
+    throw new Error(
+      'File exceeds the 2 GB limit. Open a smaller file or split the timeline.'
+    )
+  }
+
+  const headerLine = readFirstLine(filePath)
+  const format = detectFormat(headerLine)
+  if (!format) {
+    throw new Error(
+      'Unsupported timeline format. The header row must match a known Filesystem or Super timeline CSV layout.'
+    )
+  }
+
+  const headers = parseHeaders(headerLine)
+  const fileId = randomUUID()
+  const fileName = path.basename(filePath)
+
+  const { offsets, rowCount } = await indexFile(filePath, fileId, mainWindow)
+
+  const taggedRows = loadTags(filePath, fileName)
+  const fd = fs.openSync(filePath, 'r')
+
+  setSession({
+    fileId,
+    filePath,
+    fileName,
+    format,
+    headers,
+    offsets,
+    rowCount,
+    taggedRows,
+    tagsDirty: false,
+    fd
+  })
+
+  return {
+    fileId,
+    filePath,
+    fileName,
+    format,
+    headers,
+    rowCount
+  }
+}
+
+async function runSearch(
+  request: SearchRequest,
+  mainWindow: BrowserWindow
+): Promise<SearchResult> {
+  const session = getSession(request.fileId)
+  if (!session) {
+    throw new Error('File session not found')
+  }
+
+  const termLower = request.term.toLowerCase()
+  let columnIndex = -1
+  if (request.column !== 'All Columns') {
+    columnIndex = session.headers.indexOf(request.column)
+    if (columnIndex < 0) {
+      throw new Error(`Unknown column: ${request.column}`)
+    }
+  }
+
+  return new Promise((resolve, reject) => {
+    const offsetsCopy = session.offsets.slice()
+    const worker = new Worker(workerPath('searchWorker.js'), {
+      workerData: {
+        filePath: session.filePath,
+        fileId: session.fileId,
+        offsetsBuffer: offsetsCopy.buffer,
+        rowCount: session.rowCount,
+        columnIndex,
+        termLower
+      }
+    })
+
+    worker.on('message', (message: { type: string }) => {
+      if (message.type === 'progress') {
+        const progress = message as { fileId: string; linesIndexed: number }
+        sendProgress(mainWindow, {
+          fileId: progress.fileId,
+          linesIndexed: progress.linesIndexed,
+          phase: 'searching'
+        })
+      } else if (message.type === 'complete') {
+        resolve({
+          matchingRowIndices: (message as { matchingRowIndices: number[] })
+            .matchingRowIndices
+        })
+      } else if (message.type === 'error') {
+        reject(new Error((message as { message: string }).message))
+      }
+    })
+
+    worker.on('error', reject)
+    worker.on('exit', (code) => {
+      if (code !== 0) {
+        reject(new Error(`Search worker exited with code ${code}`))
+      }
+    })
+  })
+}
+
+export function registerIpcHandlers(getMainWindow: () => BrowserWindow | null): void {
+  ipcMain.handle('file:open', async () => {
+    const mainWindow = getMainWindow()
+    if (!mainWindow) {
+      throw new Error('Main window is not available')
+    }
+
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: 'Open Timeline CSV',
+      properties: ['openFile'],
+      filters: [{ name: 'CSV Files', extensions: ['csv'] }]
+    })
+
+    if (result.canceled || result.filePaths.length === 0) {
+      return null
+    }
+
+    try {
+      return await openFileAtPath(result.filePaths[0], mainWindow)
+    } catch (error) {
+      dialog.showErrorBox(
+        'Unable to Open File',
+        error instanceof Error ? error.message : String(error)
+      )
+      return null
+    }
+  })
+
+  ipcMain.handle('file:open-path', async (_event, filePath: string) => {
+    const mainWindow = getMainWindow()
+    if (!mainWindow) {
+      throw new Error('Main window is not available')
+    }
+
+    try {
+      return await openFileAtPath(filePath, mainWindow)
+    } catch (error) {
+      dialog.showErrorBox(
+        'Unable to Open File',
+        error instanceof Error ? error.message : String(error)
+      )
+      return null
+    }
+  })
+
+  ipcMain.handle('file:get-rows', async (_event, range: RowRange): Promise<RowData[]> => {
+    const session = getSession(range.fileId)
+    if (!session) {
+      throw new Error('File session not found')
+    }
+
+    return readRows(session, range.startRow, range.endRow, range.rowIndexMap)
+  })
+
+  ipcMain.handle('file:search', async (_event, request: SearchRequest) => {
+    const mainWindow = getMainWindow()
+    if (!mainWindow) {
+      throw new Error('Main window is not available')
+    }
+
+    if (!request.term.trim()) {
+      return { matchingRowIndices: [] } satisfies SearchResult
+    }
+
+    return runSearch(request, mainWindow)
+  })
+
+  ipcMain.handle('file:tag-update', async (_event, update: TagUpdate) => {
+    const session = getSession(update.fileId)
+    if (!session) {
+      throw new Error('File session not found')
+    }
+
+    if (update.tagged) {
+      session.taggedRows.add(update.rowIndex)
+    } else {
+      session.taggedRows.delete(update.rowIndex)
+    }
+    session.tagsDirty = true
+  })
+
+  ipcMain.handle('file:save-tags', async (_event, request: SaveTagsRequest) => {
+    const session = getSession(request.fileId)
+    if (!session) {
+      throw new Error('File session not found')
+    }
+
+    try {
+      saveTags(session.filePath, session.fileName, session.taggedRows)
+      session.tagsDirty = false
+      return true
+    } catch (error) {
+      dialog.showErrorBox(
+        'Unable to Save Tags',
+        error instanceof Error ? error.message : String(error)
+      )
+      return false
+    }
+  })
+
+  ipcMain.handle('file:close', async (_event, fileId: string) => {
+    const session = deleteSession(fileId)
+    if (session) {
+      fs.closeSync(session.fd)
+    }
+  })
+
+  ipcMain.handle('file:has-unsaved-tags', async (_event, fileId: string) => {
+    const session = getSession(fileId)
+    return session?.tagsDirty ?? false
+  })
+}
+
+export { normalizeHeaderLine }

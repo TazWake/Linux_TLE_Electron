@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "composite": true,
+    "strict": true,
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "jsx": "preserve",
+    "baseUrl": ".",
+    "paths": {
+      "@shared/*": ["src/shared/*"]
+    }
+  },
+  "include": ["src/renderer/**/*", "src/shared/**/*"]
+}

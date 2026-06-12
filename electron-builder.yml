@@ -1,0 +1,15 @@
+appId: com.dfir.electrontimelineviewer
+productName: ElectronTimelineViewer
+directories:
+  output: dist
+files:
+  - out/**/*
+linux:
+  target:
+    - AppImage
+    - deb
+  category: Utility
+  icon: resources/icon.png
+win:
+  target: portable
+  icon: resources/icon.png
