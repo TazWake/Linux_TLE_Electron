@@ -1,12 +1,41 @@
 import { app, BrowserWindow, Menu, shell } from 'electron'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import { registerIpcHandlers } from './ipcHandlers'
+import { hasUnsavedTags, closeAllSessions } from './fileSession'
+import { pickAndOpenFile, registerIpcHandlers } from './ipcHandlers'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 let mainWindow: BrowserWindow | null = null
 let allowClose = false
+
+function getMainWindow(): BrowserWindow | null {
+  return mainWindow
+}
+
+function requestApplicationClose(): void {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return
+  }
+
+  if (allowClose) {
+    mainWindow.close()
+    return
+  }
+
+  if (!hasUnsavedTags()) {
+    allowClose = true
+    closeAllSessions()
+    setImmediate(() => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.close()
+      }
+    })
+    return
+  }
+
+  mainWindow.webContents.send('app:request-close')
+}
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -42,7 +71,7 @@ function createWindow(): void {
       return
     }
     event.preventDefault()
-    mainWindow?.webContents.send('app:request-close')
+    requestApplicationClose()
   })
 
   mainWindow.on('closed', () => {
@@ -59,7 +88,18 @@ function buildMenu(): void {
         {
           label: 'Open…',
           accelerator: 'Ctrl+O',
-          click: () => mainWindow?.webContents.send('menu:open-file')
+          click: () => {
+            void (async () => {
+              const window = getMainWindow()
+              if (!window) {
+                return
+              }
+              const metadata = await pickAndOpenFile(window)
+              if (metadata) {
+                window.webContents.send('file:opened', metadata)
+              }
+            })()
+          }
         },
         {
           label: 'Save Tags',
@@ -76,7 +116,7 @@ function buildMenu(): void {
         { type: 'separator' },
         {
           label: 'Exit',
-          click: () => app.quit()
+          click: () => requestApplicationClose()
         }
       ]
     },
@@ -124,7 +164,7 @@ function buildMenu(): void {
 }
 
 app.whenReady().then(() => {
-  registerIpcHandlers(() => mainWindow, () => {
+  registerIpcHandlers(getMainWindow, () => {
     allowClose = true
     mainWindow?.close()
   })

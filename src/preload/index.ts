@@ -23,6 +23,7 @@ export interface ElectronApi {
   onIndexComplete: (callback: (event: IndexCompleteEvent) => void) => () => void
   onIndexFailed: (callback: (event: { fileId: string }) => void) => () => void
   onMenuAction: (callback: (action: string) => void) => () => void
+  onFileOpened: (callback: (metadata: FileMetadata) => void) => () => void
   getPathForFile: (file: File) => string
   confirmClose: () => void
   onCloseRequest: (callback: () => void) => () => void
@@ -72,6 +73,15 @@ const api: ElectronApi = {
     ipcRenderer.on('app:request-close', handler)
     return () => {
       ipcRenderer.removeListener('app:request-close', handler)
+    }
+  },
+  onFileOpened: (callback) => {
+    const handler = (_event: Electron.IpcRendererEvent, metadata: FileMetadata): void => {
+      callback(metadata)
+    }
+    ipcRenderer.on('file:opened', handler)
+    return () => {
+      ipcRenderer.removeListener('file:opened', handler)
     }
   },
   onMenuAction: (callback) => {

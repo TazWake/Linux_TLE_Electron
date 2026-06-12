@@ -48,16 +48,28 @@ export class TabManager {
   }
 
   async openFile(): Promise<void> {
-    const metadata = await window.api.openFile()
-    if (metadata) {
-      await this.addTab(metadata)
+    try {
+      const metadata = await window.api.openFile()
+      if (metadata) {
+        await this.addTab(metadata)
+      }
+    } catch (error) {
+      window.alert(
+        error instanceof Error ? error.message : 'Unable to open the selected file.'
+      )
     }
   }
 
   async openFilePath(filePath: string): Promise<void> {
-    const metadata = await window.api.openFilePath(filePath)
-    if (metadata) {
-      await this.addTab(metadata)
+    try {
+      const metadata = await window.api.openFilePath(filePath)
+      if (metadata) {
+        await this.addTab(metadata)
+      }
+    } catch (error) {
+      window.alert(
+        error instanceof Error ? error.message : 'Unable to open the dropped file.'
+      )
     }
   }
 

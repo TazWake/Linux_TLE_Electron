@@ -5,16 +5,22 @@ const MIN_FONT_SIZE = 10
 const MAX_FONT_SIZE = 24
 
 export class App {
-  private readonly tabBar: HTMLElement
-  private readonly tabContent: HTMLElement
-  private readonly addTabButton: HTMLButtonElement
-  private readonly statusRows: HTMLElement
-  private readonly statusMatches: HTMLElement
+  private readonly tabBar!: HTMLElement
+  private readonly tabContent!: HTMLElement
+  private readonly addTabButton!: HTMLButtonElement
+  private readonly statusRows!: HTMLElement
+  private readonly statusMatches!: HTMLElement
   private readonly windowTitleBase = 'ElectronTimelineViewer'
-  private readonly tabManager: TabManager
+  private readonly tabManager!: TabManager
   private fontSize = DEFAULT_FONT_SIZE
 
   constructor() {
+    if (!window.api) {
+      document.body.innerHTML =
+        '<p class="startup-error">Application API failed to load. Restart the app.</p>'
+      return
+    }
+
     this.tabBar = document.getElementById('tab-bar') as HTMLElement
     this.tabContent = document.getElementById('tab-content') as HTMLElement
     this.addTabButton = document.getElementById('add-tab') as HTMLButtonElement
@@ -36,6 +42,10 @@ export class App {
 
     window.api.onCloseRequest(() => {
       void this.handleCloseRequest()
+    })
+
+    window.api.onFileOpened((metadata) => {
+      void this.tabManager.addTab(metadata)
     })
   }
 

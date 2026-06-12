@@ -16,7 +16,7 @@ import type {
   SaveTagsRequest,
   IndexProgressEvent
 } from '../shared/types'
-import { deleteSession, getSession, setSession } from './fileSession'
+import { closeAllSessions, deleteSession, getSession, setSession } from './fileSession'
 import { readRows } from './fileReader'
 import { loadTags, saveTags } from './tagStore'
 
@@ -220,39 +220,48 @@ async function runSearch(
   })
 }
 
+export async function pickAndOpenFile(
+  mainWindow: BrowserWindow
+): Promise<FileMetadata | null> {
+  mainWindow.focus()
+
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: 'Open Timeline CSV',
+    properties: ['openFile'],
+    filters: [{ name: 'CSV Files', extensions: ['csv'] }]
+  })
+
+  if (result.canceled || result.filePaths.length === 0) {
+    return null
+  }
+
+  try {
+    return beginOpenFile(result.filePaths[0], mainWindow)
+  } catch (error) {
+    dialog.showErrorBox(
+      'Unable to Open File',
+      error instanceof Error ? error.message : String(error)
+    )
+    return null
+  }
+}
+
 export function registerIpcHandlers(
   getMainWindow: () => BrowserWindow | null,
   confirmClose: () => void
 ): void {
   ipcMain.on('app:confirm-close', () => {
+    closeAllSessions()
     confirmClose()
   })
 
   ipcMain.handle('file:open', async () => {
     const mainWindow = getMainWindow()
     if (!mainWindow) {
-      throw new Error('Main window is not available')
-    }
-
-    const result = await dialog.showOpenDialog(mainWindow, {
-      title: 'Open Timeline CSV',
-      properties: ['openFile'],
-      filters: [{ name: 'CSV Files', extensions: ['csv'] }]
-    })
-
-    if (result.canceled || result.filePaths.length === 0) {
       return null
     }
 
-    try {
-      return beginOpenFile(result.filePaths[0], mainWindow)
-    } catch (error) {
-      dialog.showErrorBox(
-        'Unable to Open File',
-        error instanceof Error ? error.message : String(error)
-      )
-      return null
-    }
+    return pickAndOpenFile(mainWindow)
   })
 
   ipcMain.handle('file:open-path', async (_event, filePath: string) => {

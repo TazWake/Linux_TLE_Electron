@@ -1,3 +1,4 @@
+import fs from 'fs'
 import type { TimelineFormat } from '../shared/types'
 
 export interface FileSession {
@@ -29,4 +30,24 @@ export function deleteSession(fileId: string): FileSession | undefined {
     sessions.delete(fileId)
   }
   return session
+}
+
+export function hasUnsavedTags(): boolean {
+  for (const session of sessions.values()) {
+    if (session.tagsDirty) {
+      return true
+    }
+  }
+  return false
+}
+
+export function closeAllSessions(): void {
+  for (const session of [...sessions.values()]) {
+    try {
+      fs.closeSync(session.fd)
+    } catch {
+      // file descriptor may already be closed
+    }
+    sessions.delete(session.fileId)
+  }
 }

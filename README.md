@@ -18,7 +18,7 @@ npm run dev
 
 If `npm run dev` reports **Electron uninstall**, the Electron binary was not downloaded (usually because install scripts were blocked). Run `npm approve-scripts electron` and `npm rebuild electron`, then try again.
 
-## Build
+git ## Build
 
 ```powershell
 npm run build:app   # compile to out/
@@ -27,7 +27,7 @@ npm run build       # compile and package (AppImage, deb, Windows portable)
 
 ## Project layout
 
-```
+```text
 src/
   main/       # Electron main process, workers, IPC
   preload/    # contextBridge API

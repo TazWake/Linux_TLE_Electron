@@ -251,3 +251,12 @@ body {
   background: #f6f8fa;
   cursor: pointer;
 }
+
+.startup-error {
+  margin: 24px;
+  padding: 16px;
+  border: 1px solid #cf222e;
+  border-radius: 6px;
+  background: #ffebe9;
+  color: #82071e;
+}
