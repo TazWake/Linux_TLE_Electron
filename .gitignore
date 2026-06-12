@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+
+# Build output
+out/
+dist/
+
+# Electron / Vite
+*.local
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# Environment
+.env
+.env.*
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Test artifacts (keep test_files/ source data)
+test_files/*.tags.json
