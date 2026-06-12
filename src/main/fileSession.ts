@@ -30,7 +30,3 @@ export function deleteSession(fileId: string): FileSession | undefined {
   }
   return session
 }
-
-export function getAllSessions(): FileSession[] {
-  return [...sessions.values()]
-}

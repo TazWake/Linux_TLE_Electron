@@ -7,6 +7,12 @@ export interface FileMetadata {
   format: TimelineFormat
   headers: string[]
   rowCount: number
+  indexing?: boolean
+}
+
+export interface IndexCompleteEvent {
+  fileId: string
+  rowCount: number
 }
 
 export interface RowRange {

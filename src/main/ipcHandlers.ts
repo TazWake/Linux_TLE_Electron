@@ -6,7 +6,6 @@ import { dialog, ipcMain, type BrowserWindow } from 'electron'
 import { fileURLToPath } from 'url'
 import { MAX_FILE_BYTES } from '../shared/constants'
 import { detectFormat, parseHeaders } from '../shared/formatDetection'
-import { normalizeHeaderLine } from '../shared/csv'
 import type {
   FileMetadata,
   RowRange,
@@ -86,10 +85,10 @@ async function indexFile(
   })
 }
 
-async function openFileAtPath(
+function beginOpenFile(
   filePath: string,
   mainWindow: BrowserWindow
-): Promise<FileMetadata> {
+): FileMetadata {
   if (!fs.existsSync(filePath)) {
     throw new Error(`File not found: ${filePath}`)
   }
@@ -112,9 +111,6 @@ async function openFileAtPath(
   const headers = parseHeaders(headerLine)
   const fileId = randomUUID()
   const fileName = path.basename(filePath)
-
-  const { offsets, rowCount } = await indexFile(filePath, fileId, mainWindow)
-
   const taggedRows = loadTags(filePath, fileName)
   const fd = fs.openSync(filePath, 'r')
 
@@ -124,12 +120,36 @@ async function openFileAtPath(
     fileName,
     format,
     headers,
-    offsets,
-    rowCount,
+    offsets: new BigInt64Array(0),
+    rowCount: 0,
     taggedRows,
     tagsDirty: false,
     fd
   })
+
+  void indexFile(filePath, fileId, mainWindow)
+    .then(({ offsets, rowCount }) => {
+      const session = getSession(fileId)
+      if (!session) {
+        return
+      }
+      session.offsets = offsets
+      session.rowCount = rowCount
+      mainWindow.webContents.send('file:index-complete', { fileId, rowCount })
+    })
+    .catch((error) => {
+      deleteSession(fileId)
+      try {
+        fs.closeSync(fd)
+      } catch {
+        // ignore close errors during failed open
+      }
+      dialog.showErrorBox(
+        'Unable to Index File',
+        error instanceof Error ? error.message : String(error)
+      )
+      mainWindow.webContents.send('file:index-failed', { fileId })
+    })
 
   return {
     fileId,
@@ -137,7 +157,8 @@ async function openFileAtPath(
     fileName,
     format,
     headers,
-    rowCount
+    rowCount: 0,
+    indexing: true
   }
 }
 
@@ -199,7 +220,14 @@ async function runSearch(
   })
 }
 
-export function registerIpcHandlers(getMainWindow: () => BrowserWindow | null): void {
+export function registerIpcHandlers(
+  getMainWindow: () => BrowserWindow | null,
+  confirmClose: () => void
+): void {
+  ipcMain.on('app:confirm-close', () => {
+    confirmClose()
+  })
+
   ipcMain.handle('file:open', async () => {
     const mainWindow = getMainWindow()
     if (!mainWindow) {
@@ -217,7 +245,7 @@ export function registerIpcHandlers(getMainWindow: () => BrowserWindow | null): 
     }
 
     try {
-      return await openFileAtPath(result.filePaths[0], mainWindow)
+      return beginOpenFile(result.filePaths[0], mainWindow)
     } catch (error) {
       dialog.showErrorBox(
         'Unable to Open File',
@@ -234,7 +262,7 @@ export function registerIpcHandlers(getMainWindow: () => BrowserWindow | null): 
     }
 
     try {
-      return await openFileAtPath(filePath, mainWindow)
+      return beginOpenFile(filePath, mainWindow)
     } catch (error) {
       dialog.showErrorBox(
         'Unable to Open File',
@@ -306,10 +334,4 @@ export function registerIpcHandlers(getMainWindow: () => BrowserWindow | null): 
     }
   })
 
-  ipcMain.handle('file:has-unsaved-tags', async (_event, fileId: string) => {
-    const session = getSession(fileId)
-    return session?.tagsDirty ?? false
-  })
 }
-
-export { normalizeHeaderLine }

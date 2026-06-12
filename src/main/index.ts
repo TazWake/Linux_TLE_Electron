@@ -6,6 +6,7 @@ import { registerIpcHandlers } from './ipcHandlers'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 let mainWindow: BrowserWindow | null = null
+let allowClose = false
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -36,8 +37,17 @@ function createWindow(): void {
     mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'))
   }
 
+  mainWindow.on('close', (event) => {
+    if (allowClose) {
+      return
+    }
+    event.preventDefault()
+    mainWindow?.webContents.send('app:request-close')
+  })
+
   mainWindow.on('closed', () => {
     mainWindow = null
+    allowClose = false
   })
 }
 
@@ -114,7 +124,10 @@ function buildMenu(): void {
 }
 
 app.whenReady().then(() => {
-  registerIpcHandlers(() => mainWindow)
+  registerIpcHandlers(() => mainWindow, () => {
+    allowClose = true
+    mainWindow?.close()
+  })
   buildMenu()
   createWindow()
 

@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ElectronTimelineViewer</title>
+    <link rel="stylesheet" href="./styles/main.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <nav id="tab-bar" class="tab-bar" role="tablist" aria-label="Open timeline files">
+        <button id="add-tab" type="button" class="tab-add" aria-label="Open file">+</button>
+      </nav>
+    </header>
+
+    <main id="tab-content" class="tab-content" role="main"></main>
+
+    <footer class="status-bar" aria-live="polite">
+      <span id="status-rows">Rows: —</span>
+      <span class="status-separator" aria-hidden="true">|</span>
+      <span id="status-matches">Matches: —</span>
+    </footer>
+
+    <script type="module" src="./index.ts"></script>
+  </body>
+</html>
