@@ -2,6 +2,17 @@
 
 This document breaks the build into reviewable phases. Each phase has clear deliverables and acceptance checks before moving on.
 
+## Current status (2026-06-20)
+
+| Phase | Status |
+| --- | --- |
+| 1 — Scaffold & toolchain | Complete |
+| 2 — Main process file I/O | Complete |
+| 3 — Preload & renderer shell | Complete |
+| 4 — AG Grid infinite model | Complete |
+| 5 — Search, tags, field detail | Complete |
+| 6 — Packaging & acceptance | In progress (Windows build verified; icon added; manual large-file testing pending) |
+
 ---
 
 ## Phase 1 — Project Scaffold and Toolchain
