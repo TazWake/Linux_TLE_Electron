@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build && electron-builder",
+    "build:linux": "electron-vite build && electron-builder --linux",
     "build:app": "electron-vite build",
     "preview": "electron-vite preview"
   },

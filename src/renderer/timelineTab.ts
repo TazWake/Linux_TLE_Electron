@@ -87,6 +87,7 @@ export class TimelineTab {
 
     this.gridHost = document.createElement('div')
     this.gridHost.className = 'ag-theme-quartz grid-host'
+    this.gridHost.hidden = true
 
     this.container.append(toolbar, this.loadingEl, this.gridHost)
     parent.append(this.container)
@@ -100,6 +101,10 @@ export class TimelineTab {
 
   isTagsDirty(): boolean {
     return this.tagsDirty
+  }
+
+  getMatchCount(): number | null {
+    return this.matchIndices ? this.matchIndices.length : null
   }
 
   setTagsDirty(dirty: boolean): void {

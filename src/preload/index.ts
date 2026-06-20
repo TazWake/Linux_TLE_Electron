@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type {
   FileMetadata,
@@ -27,6 +28,7 @@ export interface ElectronApi {
   getPathForFile: (file: File) => string
   confirmClose: () => void
   onCloseRequest: (callback: () => void) => () => void
+  setSaveTagsEnabled: (enabled: boolean) => void
 }
 
 const api: ElectronApi = {
@@ -66,6 +68,8 @@ const api: ElectronApi = {
   },
   getPathForFile: (file: File) => webUtils.getPathForFile(file),
   confirmClose: () => ipcRenderer.send('app:confirm-close'),
+  setSaveTagsEnabled: (enabled: boolean) =>
+    ipcRenderer.send('app:set-save-tags-enabled', enabled),
   onCloseRequest: (callback) => {
     const handler = (): void => {
       callback()

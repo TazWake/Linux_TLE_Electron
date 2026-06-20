@@ -132,7 +132,7 @@ export class TabManager {
 
     const active = this.tabs.find((entry) => entry.id === tabId)
     if (active) {
-      this.onStatusChange(active.metadata.rowCount, null)
+      this.onStatusChange(active.metadata.rowCount, active.tab.getMatchCount())
     }
   }
 

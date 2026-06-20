@@ -1,4 +1,5 @@
-import { app, BrowserWindow, Menu, shell } from 'electron'
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+import { app, BrowserWindow, ipcMain, Menu, shell } from 'electron'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { hasUnsavedTags, closeAllSessions } from './fileSession'
@@ -163,11 +164,24 @@ function buildMenu(): void {
   Menu.setApplicationMenu(Menu.buildFromTemplate(template))
 }
 
+function setSaveTagsMenuEnabled(enabled: boolean): void {
+  const menu = Menu.getApplicationMenu()
+  const item = menu?.getMenuItemById('save-tags')
+  if (item) {
+    item.enabled = enabled
+  }
+}
+
 app.whenReady().then(() => {
   registerIpcHandlers(getMainWindow, () => {
     allowClose = true
     mainWindow?.close()
   })
+
+  ipcMain.on('app:set-save-tags-enabled', (_event, enabled: boolean) => {
+    setSaveTagsMenuEnabled(Boolean(enabled))
+  })
+
   buildMenu()
   createWindow()
 

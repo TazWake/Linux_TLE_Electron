@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
 import { TabManager } from './tabManager'
 
 const DEFAULT_FONT_SIZE = 13
@@ -154,6 +155,7 @@ export class App {
     const dirtySuffix = dirtyTabs.length > 0 ? ' *' : ''
     document.title = `${this.windowTitleBase}${dirtySuffix}`
     this.tabManager.updateTabTitles()
+    window.api.setSaveTagsEnabled(this.tabManager.getActiveTab()?.isTagsDirty() ?? false)
   }
 
   async handleCloseRequest(): Promise<void> {
