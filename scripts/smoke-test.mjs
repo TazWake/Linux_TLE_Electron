@@ -149,24 +149,83 @@ function verifyCsvFixtures() {
   return true
 }
 
+function findPackagedExecutable() {
+  for (const folder of ['release', 'dist']) {
+    const distDir = path.join(root, folder)
+    if (!fs.existsSync(distDir)) {
+      continue
+    }
+
+    const entries = fs.readdirSync(distDir)
+    const portableExe = entries.find(
+      (name) => name.endsWith('.exe') && name.includes('ElectronTimelineViewer')
+    )
+    if (portableExe) {
+      return path.join(distDir, portableExe)
+    }
+
+    const unpackedExe = path.join(distDir, 'win-unpacked', 'ElectronTimelineViewer.exe')
+    if (fs.existsSync(unpackedExe)) {
+      return unpackedExe
+    }
+  }
+
+  return null
+}
+
+function resolveElectronLaunch() {
+  try {
+    const electronPath = path.join(
+      root,
+      'node_modules',
+      'electron',
+      'dist',
+      process.platform === 'win32' ? 'electron.exe' : 'electron'
+    )
+    if (fs.existsSync(electronPath)) {
+      return {
+        command: electronPath,
+        args: [path.join(root, 'out', 'main', 'index.js')],
+        label: 'development Electron binary'
+      }
+    }
+  } catch {
+    // fall through to packaged build
+  }
+
+  const packaged = findPackagedExecutable()
+  if (packaged) {
+    return { command: packaged, args: [], label: 'packaged executable' }
+  }
+
+  return null
+}
+
 function launchElectronBriefly() {
   return new Promise((resolve) => {
-    console.log('\nLaunching Electron briefly to verify startup...')
+    console.log('\nLaunching application briefly to verify startup...')
 
-    const electronCmd = process.platform === 'win32' ? 'npx.cmd' : 'npx'
-    const child = spawn(
-      electronCmd,
-      ['electron', path.join(root, 'out', 'main', 'index.js')],
-      {
-        cwd: root,
-        env: {
-          ...process.env,
-          ELECTRON_DISABLE_SECURITY_WARNINGS: 'true'
-        },
-        stdio: ['ignore', 'pipe', 'pipe'],
-        shell: process.platform === 'win32'
-      }
-    )
+    const launch = resolveElectronLaunch()
+    if (!launch) {
+      console.log(
+        'SKIP: No Electron binary or packaged build found. Run npm run build first, or reinstall electron.'
+      )
+      resolve(true)
+      return
+    }
+
+    console.log(`Using ${launch.label}: ${launch.command}`)
+
+    const child = spawn(launch.command, launch.args, {
+      cwd: root,
+      env: {
+        ...process.env,
+        ELECTRON_DISABLE_SECURITY_WARNINGS: 'true'
+      },
+      stdio: ['ignore', 'pipe', 'pipe'],
+      detached: false,
+      shell: false
+    })
 
     let stderr = ''
     child.stderr?.on('data', (chunk) => {

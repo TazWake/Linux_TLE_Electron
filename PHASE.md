@@ -11,7 +11,7 @@ This document breaks the build into reviewable phases. Each phase has clear deli
 | 3 — Preload & renderer shell | Complete |
 | 4 — AG Grid infinite model | Complete |
 | 5 — Search, tags, field detail | Complete |
-| 6 — Packaging & acceptance | In progress (Windows build verified; icon added; manual large-file testing pending) |
+| 6 — Packaging & acceptance | Complete (Windows portable verified; Linux builds via `build:linux` on Linux/WSL) |
 
 ---
 

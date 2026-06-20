@@ -11,7 +11,9 @@
     "build": "electron-vite build && electron-builder",
     "build:linux": "electron-vite build && electron-builder --linux",
     "build:app": "electron-vite build",
-    "preview": "electron-vite preview"
+    "smoke-test": "node scripts/smoke-test.mjs",
+    "preview": "electron-vite preview",
+    "postinstall": "node node_modules/electron/install.js"
   },
   "dependencies": {
     "ag-grid-community": "^33.3.2",
@@ -19,7 +21,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.15.29",
-    "electron": "^35.1.5",
+    "electron": "^35.7.5",
     "electron-builder": "^26.0.12",
     "electron-vite": "^3.1.0",
     "typescript": "^5.8.3",
