@@ -72,12 +72,11 @@ function runBuildApp() {
 }
 
 function verifyBuildOutput() {
-  const required = [
-    'out/main/index.js',
+  const required = ['out/main/index.js', 'out/renderer/index.html']
+  const preloadCandidates = [
     'out/preload/index.js',
-    'out/renderer/index.html',
-    'out/main/fileIndexer.js',
-    'out/main/searchWorker.js'
+    'out/preload/index.mjs',
+    'out/preload/index.cjs'
   ]
 
   for (const relativePath of required) {
@@ -86,6 +85,14 @@ function verifyBuildOutput() {
       fail(`Missing build artifact: ${relativePath}`)
       return false
     }
+  }
+
+  const preloadFound = preloadCandidates.some((relativePath) =>
+    fs.existsSync(path.join(root, relativePath))
+  )
+  if (!preloadFound) {
+    fail(`Missing preload bundle (expected one of: ${preloadCandidates.join(', ')})`)
+    return false
   }
 
   pass('Build artifacts present in out/')

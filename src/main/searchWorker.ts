@@ -6,7 +6,7 @@ import { SEARCH_PROGRESS_INTERVAL } from '../shared/constants'
 interface SearchInput {
   filePath: string
   fileId: string
-  offsetsBuffer: ArrayBuffer
+  offsets: string[]
   rowCount: number
   columnIndex: number
   termLower: string
@@ -61,7 +61,10 @@ function readLineAtOffset(fd: number, offset: bigint): string {
 }
 
 function runSearch(): void {
-  const offsets = new BigInt64Array(input.offsetsBuffer)
+  const offsets = new BigInt64Array(input.offsets.length)
+  for (let index = 0; index < input.offsets.length; index++) {
+    offsets[index] = BigInt(input.offsets[index])
+  }
   const fd = fs.openSync(input.filePath, 'r')
   const matches: number[] = []
 

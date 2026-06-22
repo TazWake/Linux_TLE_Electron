@@ -4,6 +4,7 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 import { hasUnsavedTags, closeAllSessions } from './fileSession'
 import { pickAndOpenFile, registerIpcHandlers } from './ipcHandlers'
+import { resolvePreloadPath } from './paths'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -39,17 +40,23 @@ function requestApplicationClose(): void {
 }
 
 function createWindow(): void {
+  const preloadPath = resolvePreloadPath()
+
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
     show: false,
     webPreferences: {
-      preload: path.join(__dirname, '../preload/index.js'),
+      preload: preloadPath,
       contextIsolation: true,
       nodeIntegration: false,
       webSecurity: true,
       sandbox: false
     }
+  })
+
+  mainWindow.webContents.on('preload-error', (_event, failedPath, error) => {
+    console.error(`Preload failed (${failedPath}):`, error)
   })
 
   mainWindow.on('ready-to-show', () => {

@@ -180,6 +180,12 @@ Your Node version is too old. Upgrade to Node 20.19+ or 22 LTS, remove `node_mod
 **App window opens but File → Open does nothing**  
 Restart with `npm run dev` after a clean `npm install`. Ensure `node_modules/electron/dist/electron` exists.
 
+**“Application API failed to load” on startup**  
+The preload script did not attach `window.api` (wrong preload path or preload crash). Pull the latest code, run `npm run build:app`, then `npm run dev`. Check the terminal for `Preload failed` messages.
+
+**“Unable to index file — Cannot convert undefined to a BigInt”**  
+Usually a worker path or offset transfer bug; fixed in current builds by resolving workers via electron-vite `?modulePath`. Update the repo and rebuild.
+
 **Blank window after `npm start`**  
 Run `npm run build:app` first. `out/renderer/index.html` must exist.
 

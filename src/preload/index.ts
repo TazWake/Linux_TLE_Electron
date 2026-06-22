@@ -1,16 +1,59 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
-import type {
-  FileMetadata,
-  RowRange,
-  RowData,
-  SearchRequest,
-  SearchResult,
-  TagUpdate,
-  SaveTagsRequest,
-  IndexProgressEvent,
-  IndexCompleteEvent
-} from '../shared/types'
+
+export interface FileMetadata {
+  fileId: string
+  filePath: string
+  fileName: string
+  format: 'filesystem' | 'super'
+  headers: string[]
+  rowCount: number
+  indexing?: boolean
+}
+
+export interface RowRange {
+  fileId: string
+  startRow: number
+  endRow: number
+  rowIndexMap?: number[]
+}
+
+export interface RowData {
+  rowIndex: number
+  cells: string[]
+  tagged: boolean
+}
+
+export interface SearchRequest {
+  fileId: string
+  column: string
+  term: string
+}
+
+export interface SearchResult {
+  matchingRowIndices: number[]
+}
+
+export interface TagUpdate {
+  fileId: string
+  rowIndex: number
+  tagged: boolean
+}
+
+export interface SaveTagsRequest {
+  fileId: string
+}
+
+export interface IndexProgressEvent {
+  fileId: string
+  linesIndexed: number
+  phase: 'indexing' | 'searching'
+}
+
+export interface IndexCompleteEvent {
+  fileId: string
+  rowCount: number
+}
 
 export interface ElectronApi {
   openFile: () => Promise<FileMetadata | null>
@@ -66,7 +109,12 @@ const api: ElectronApi = {
       ipcRenderer.removeListener('file:index-failed', handler)
     }
   },
-  getPathForFile: (file: File) => webUtils.getPathForFile(file),
+  getPathForFile: (file: File) => {
+    if (!webUtils?.getPathForFile) {
+      throw new Error('File paths are not available in this environment.')
+    }
+    return webUtils.getPathForFile(file)
+  },
   confirmClose: () => ipcRenderer.send('app:confirm-close'),
   setSaveTagsEnabled: (enabled: boolean) =>
     ipcRenderer.send('app:set-save-tags-enabled', enabled),
@@ -116,4 +164,8 @@ const api: ElectronApi = {
   }
 }
 
-contextBridge.exposeInMainWorld('api', api)
+try {
+  contextBridge.exposeInMainWorld('api', api)
+} catch (error) {
+  console.error('Failed to expose preload API:', error)
+}

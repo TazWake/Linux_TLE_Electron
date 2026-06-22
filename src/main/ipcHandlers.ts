@@ -3,7 +3,8 @@ import path from 'path'
 import fs from 'fs'
 import { randomUUID } from 'crypto'
 import { dialog, ipcMain, type BrowserWindow } from 'electron'
-import { fileURLToPath } from 'url'
+import fileIndexerPath from './fileIndexer?modulePath'
+import searchWorkerPath from './searchWorker?modulePath'
 import { MAX_FILE_BYTES } from '../shared/constants'
 import { detectFormat, parseHeaders } from '../shared/formatDetection'
 import type {
@@ -20,10 +21,12 @@ import { closeAllSessions, deleteSession, getSession, setSession } from './fileS
 import { readRows } from './fileReader'
 import { loadTags, saveTags } from './tagStore'
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
-
-function workerPath(name: string): string {
-  return path.join(__dirname, name)
+function offsetsFromStrings(offsetStrings: string[]): BigInt64Array {
+  const offsets = new BigInt64Array(offsetStrings.length)
+  for (let index = 0; index < offsetStrings.length; index++) {
+    offsets[index] = BigInt(offsetStrings[index])
+  }
+  return offsets
 }
 
 function sendProgress(mainWindow: BrowserWindow, event: IndexProgressEvent): void {
@@ -52,7 +55,8 @@ async function indexFile(
   mainWindow: BrowserWindow
 ): Promise<{ offsets: BigInt64Array; rowCount: number }> {
   return new Promise((resolve, reject) => {
-    const worker = new Worker(workerPath('fileIndexer.js'), {
+    let settled = false
+    const worker = new Worker(fileIndexerPath, {
       workerData: { filePath, fileId }
     })
 
@@ -65,20 +69,27 @@ async function indexFile(
           phase: 'indexing'
         })
       } else if (message.type === 'complete') {
+        settled = true
         const complete = message as {
-          offsetsBuffer: ArrayBuffer
+          offsets: string[]
           rowCount: number
         }
-        const offsets = new BigInt64Array(complete.offsetsBuffer)
-        resolve({ offsets, rowCount: complete.rowCount })
+        resolve({
+          offsets: offsetsFromStrings(complete.offsets),
+          rowCount: complete.rowCount
+        })
       } else if (message.type === 'error') {
+        settled = true
         reject(new Error((message as { message: string }).message))
       }
     })
 
-    worker.on('error', reject)
+    worker.on('error', (error) => {
+      settled = true
+      reject(error)
+    })
     worker.on('exit', (code) => {
-      if (code !== 0) {
+      if (!settled && code !== 0) {
         reject(new Error(`Indexer worker exited with code ${code}`))
       }
     })
@@ -181,12 +192,13 @@ async function runSearch(
   }
 
   return new Promise((resolve, reject) => {
-    const offsetsCopy = session.offsets.slice()
-    const worker = new Worker(workerPath('searchWorker.js'), {
+    let settled = false
+    const offsetStrings = Array.from(session.offsets, (offset) => offset.toString())
+    const worker = new Worker(searchWorkerPath, {
       workerData: {
         filePath: session.filePath,
         fileId: session.fileId,
-        offsetsBuffer: offsetsCopy.buffer,
+        offsets: offsetStrings,
         rowCount: session.rowCount,
         columnIndex,
         termLower
@@ -202,18 +214,23 @@ async function runSearch(
           phase: 'searching'
         })
       } else if (message.type === 'complete') {
+        settled = true
         resolve({
           matchingRowIndices: (message as { matchingRowIndices: number[] })
             .matchingRowIndices
         })
       } else if (message.type === 'error') {
+        settled = true
         reject(new Error((message as { message: string }).message))
       }
     })
 
-    worker.on('error', reject)
+    worker.on('error', (error) => {
+      settled = true
+      reject(error)
+    })
     worker.on('exit', (code) => {
-      if (code !== 0) {
+      if (!settled && code !== 0) {
         reject(new Error(`Search worker exited with code ${code}`))
       }
     })

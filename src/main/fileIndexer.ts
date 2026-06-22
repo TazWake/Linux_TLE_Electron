@@ -9,7 +9,7 @@ interface IndexerInput {
 
 interface IndexerComplete {
   type: 'complete'
-  offsetsBuffer: ArrayBuffer
+  offsets: string[]
   rowCount: number
 }
 
@@ -110,19 +110,11 @@ function runIndexer(): void {
       }
     }
 
-    const offsetArray = new BigInt64Array(offsets.length)
-    for (let i = 0; i < offsets.length; i++) {
-      offsetArray[i] = offsets[i]
-    }
-
-    parentPort?.postMessage(
-      {
-        type: 'complete',
-        offsetsBuffer: offsetArray.buffer,
-        rowCount: lineCount
-      } satisfies IndexerComplete,
-      [offsetArray.buffer]
-    )
+    parentPort?.postMessage({
+      type: 'complete',
+      offsets: offsets.map((offset) => offset.toString()),
+      rowCount: lineCount
+    } satisfies IndexerComplete)
   } catch (error) {
     parentPort?.postMessage({
       type: 'error',
