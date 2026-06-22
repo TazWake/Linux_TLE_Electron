@@ -73,16 +73,27 @@ These steps are for building and running from source on a Linux machine (native 
 
 | Requirement | Notes |
 |-------------|--------|
-| **Node.js 20.19+** (22 LTS recommended) | Node 18 is unsupported; you will see `npm WARN EBADENGINE` warnings. Check with `node -v`. Use [nvm](https://github.com/nvm-sh/nvm) and the repo `.nvmrc` (`nvm install && nvm use`). |
-| **npm** 9+ | Bundled with Node. |
+| **Node.js 20.19+** (22 LTS recommended) | **Do not use the distro `node` package on SIFT/Ubuntu** — it is often Node 12 (`node -v` shows `v12.x`). That is too old and `npm install` will fail. Install Node 22 with [nvm](https://github.com/nvm-sh/nvm) and the repo `.nvmrc` (`nvm install && nvm use`). |
+| **npm** 9+ | Bundled with Node from nvm. |
 | **Git** | To clone the repository. |
 | **Build tools** (for packaging) | On Debian/Ubuntu: `sudo apt install -y fakeroot dpkg rpm squashfs-tools` (AppImage/deb targets). |
+
+**SIFT Workstation / Ubuntu:** check Node **before** `npm install`:
+
+```bash
+node -v
+which node
+```
+
+You need `v20.19.0` or newer (prefer `v22.x`). If you see `v12.x` from `/usr/bin/node`, install nvm and Node 22 first (see [Troubleshooting](#syntaxerror-unexpected-token--during-npm-install)).
 
 ### 1. Clone and install
 
 ```bash
 git clone https://github.com/TazWake/Linux_TLE_Electron.git
 cd Linux_TLE_Electron
+nvm install && nvm use    # skip if you already have Node 22 active
+node -v                   # must be >= 20.19.0
 npm install
 ```
 
@@ -173,6 +184,30 @@ npm run smoke-test
 ---
 
 ## Troubleshooting
+
+### `SyntaxError: Unexpected token '?'` during `npm install`
+
+This almost always means **Node.js is too old** (common on SIFT Workstation: `node -v` shows `v12.22.9` from `/usr/bin/node`). Electron 35 and the build tools require **Node 20.19+**.
+
+```bash
+node -v
+which node
+```
+
+Upgrade with nvm, then reinstall:
+
+```bash
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+source ~/.bashrc
+cd ~/test/Linux_TLE_Electron   # your clone path
+nvm install 22
+nvm use 22
+node -v                        # should show v22.x.x
+rm -rf node_modules
+npm install
+```
+
+The project `preinstall` script blocks install on unsupported Node and prints this guidance automatically.
 
 **`npm WARN EBADENGINE` during `npm install`**  
 Your Node version is too old (Node 18 is common on Ubuntu LTS). Check what you are running:
