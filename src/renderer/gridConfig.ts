@@ -147,6 +147,8 @@ export function createGridOptions(
   onCellDoubleClicked: GridOptions<GridRowRecord>['onCellDoubleClicked']
 ): GridOptions<GridRowRecord> {
   return {
+    // v33 defaults to the new JS theme API; we import ag-theme-quartz.css (legacy CSS themes).
+    theme: 'legacy',
     rowModelType: 'infinite',
     cacheBlockSize: 100,
     maxBlocksInCache: 20,

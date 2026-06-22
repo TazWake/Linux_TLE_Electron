@@ -72,6 +72,7 @@ export interface ElectronApi {
   confirmClose: () => void
   onCloseRequest: (callback: () => void) => () => void
   setSaveTagsEnabled: (enabled: boolean) => void
+  reportRendererError: (scope: string, message: string) => void
 }
 
 const api: ElectronApi = {
@@ -118,6 +119,8 @@ const api: ElectronApi = {
   confirmClose: () => ipcRenderer.send('app:confirm-close'),
   setSaveTagsEnabled: (enabled: boolean) =>
     ipcRenderer.send('app:set-save-tags-enabled', enabled),
+  reportRendererError: (scope: string, message: string) =>
+    ipcRenderer.send('renderer:error', scope, message),
   onCloseRequest: (callback) => {
     const handler = (): void => {
       callback()

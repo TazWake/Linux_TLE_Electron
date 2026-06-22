@@ -7,6 +7,7 @@ import {
 import type { FileMetadata } from '../shared/types'
 import { createGridOptions, rowToGridRecord } from './gridConfig'
 import { FieldDetailWindow } from './fieldDetailWindow'
+import { logRenderer, logRendererError } from './rendererDebug'
 
 export class TimelineTab {
   readonly metadata: FileMetadata
@@ -137,7 +138,10 @@ export class TimelineTab {
     this.indexing = false
     this.loadingEl.hidden = true
     this.gridHost.hidden = false
-    this.mountGrid()
+    // Defer grid creation until layout has settled (avoids zero-height container on Linux).
+    requestAnimationFrame(() => {
+      this.mountGrid()
+    })
   }
 
   setFontSize(size: number): void {
@@ -160,6 +164,15 @@ export class TimelineTab {
   }
 
   private mountGrid(): void {
+    if (this.gridApi) {
+      return
+    }
+
+    logRenderer('grid', `mounting ${this.metadata.fileName}`, {
+      rowCount: this.metadata.rowCount,
+      columns: this.metadata.headers.length
+    })
+
     const options = createGridOptions(
       this.metadata,
       (rowIndex, tagged) => void this.handleTagToggle(rowIndex, tagged),
@@ -172,8 +185,17 @@ export class TimelineTab {
     )
 
     options.datasource = this.createDatasource()
-    this.gridApi = createGrid(this.gridHost, options)
-    this.gridHost.style.fontSize = `${this.fontSize}px`
+
+    try {
+      this.gridApi = createGrid(this.gridHost, options)
+      this.gridHost.style.fontSize = `${this.fontSize}px`
+      logRenderer('grid', `mounted ${this.metadata.fileName}`)
+    } catch (error) {
+      logRendererError('grid', `createGrid failed for ${this.metadata.fileName}`, error)
+      this.loadingEl.hidden = false
+      this.loadingEl.textContent = 'Unable to display grid. See terminal for [ETV renderer] errors.'
+      this.gridHost.hidden = true
+    }
   }
 
   private createDatasource(): IDatasource {
@@ -218,7 +240,9 @@ export class TimelineTab {
       }
 
       params.successCallback(gridRows, lastRow)
-    } catch {
+      logRenderer('grid', `rows ${startRow}-${endRow}`, { returned: gridRows.length, lastRow })
+    } catch (error) {
+      logRendererError('grid', 'fetchRows failed', error)
       params.failCallback()
     }
   }

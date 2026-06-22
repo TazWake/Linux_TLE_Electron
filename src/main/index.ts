@@ -78,8 +78,18 @@ function createWindow(): void {
   })
 
   mainWindow.webContents.on('render-process-gone', (_event, details) => {
-    console.error('Renderer process exited:', details)
+    errorLog('renderer', 'process gone', details)
   })
+
+  mainWindow.webContents.on('console-message', (_event, level, message, line, sourceId) => {
+    if (level >= 2 && message.includes('[ETV')) {
+      console.error(`[renderer] ${message} (${sourceId}:${line})`)
+    }
+  })
+
+  if (process.env.ETV_DEBUG === '1') {
+    mainWindow.webContents.openDevTools({ mode: 'detach' })
+  }
 
   mainWindow.on('ready-to-show', () => {
     mainWindow?.show()
@@ -225,6 +235,10 @@ app.whenReady().then(() => {
 
   ipcMain.on('app:set-save-tags-enabled', (_event, enabled: boolean) => {
     setSaveTagsMenuEnabled(Boolean(enabled))
+  })
+
+  ipcMain.on('renderer:error', (_event, scope: unknown, message: unknown) => {
+    errorLog('renderer', String(scope), String(message))
   })
 
   buildMenu()
