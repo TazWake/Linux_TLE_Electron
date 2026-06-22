@@ -10,7 +10,7 @@ GPL-licensed desktop timeline CSV viewer for Linux. It opens **filesystem timeli
 
 Download the latest release from [GitHub Releases](https://github.com/TazWake/Linux_TLE_Electron/releases). Each tagged release includes an **AppImage** and a **`.deb`** for `amd64`.
 
-**AppImage**
+**AppImage**:
 
 ```bash
 chmod +x ElectronTimelineViewer-*.AppImage
@@ -19,7 +19,7 @@ chmod +x ElectronTimelineViewer-*.AppImage
 
 AppImage execution requires [FUSE](https://github.com/AppImage/AppImageKit/wiki/FUSE) on the host where you run the app.
 
-**Debian / Ubuntu (.deb)**
+**Debian / Ubuntu (.deb)**: 
 
 ```bash
 sudo dpkg -i electron-timeline-viewer_*_amd64.deb
