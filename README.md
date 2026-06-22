@@ -4,8 +4,22 @@ GPL-licensed desktop timeline CSV viewer for Linux and Windows, built with Elect
 
 ## Requirements
 
-- Node.js 20+
-- npm
+- **Node.js 20.19+** (22 LTS recommended). Node 18 is not supported for building this project.
+- npm 9+
+
+Some dependencies (for example `electron-builder` and `@electron/rebuild`) declare stricter engine requirements. On Node 18 you will see `npm WARN EBADENGINE` messages during `npm install`. The install may still finish, but dev and packaging are unsupported on that version — upgrade Node before reporting build issues.
+
+Check your version:
+
+```bash
+node -v
+```
+
+Upgrade options:
+
+- [nodejs.org](https://nodejs.org/) — install the current **22 LTS** build
+- [nvm](https://github.com/nvm-sh/nvm) — `nvm install 22 && nvm use 22` (uses the `.nvmrc` in this repo)
+- [fnm](https://github.com/Schniz/fnm) — `fnm install && fnm use`
 
 ## Deployment (end users)
 
@@ -21,14 +35,14 @@ Pre-built binaries are published on [GitHub Releases](https://github.com/TazWake
 
 Linux builds (AppImage and `.deb`) are produced on a Linux host or WSL. When available on Releases:
 
-**AppImage**
+**AppImage**:
 
 ```bash
 chmod +x ElectronTimelineViewer-<version>.AppImage
 ./ElectronTimelineViewer-<version>.AppImage
 ```
 
-**Debian/Ubuntu (.deb)**
+**Debian/Ubuntu (.deb)**:
 
 ```bash
 sudo dpkg -i electron-timeline-viewer_<version>_amd64.deb
@@ -39,13 +53,15 @@ Tag files for Super timelines are stored under your user data directory (typical
 
 ## Build from source (developers)
 
-Clone the repository and install dependencies:
+Clone the repository and install dependencies (use Node 20.19+ or 22 LTS):
 
 ```powershell
 git clone https://github.com/TazWake/Linux_TLE_Electron.git
 cd Linux_TLE_Electron
 npm install
 ```
+
+`npm WARN EBADENGINE` during install means your Node version is below what a dependency expects. Upgrade Node (see **Requirements** above); do not treat those lines as a failed install unless `npm install` exits with a non-zero code.
 
 If `npm run dev` reports **Electron failed to install correctly**, the Electron binary did not download (often because install scripts were blocked). Run:
 
