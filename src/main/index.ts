@@ -6,8 +6,17 @@ import { hasUnsavedTags, closeAllSessions } from './fileSession'
 import { pickAndOpenFile, registerIpcHandlers } from './ipcHandlers'
 import { applyLinuxGpuCompat } from './linuxGpuCompat'
 import { resolvePreloadPath } from './paths'
+import { debugLog, errorLog } from './debugLog'
 
 applyLinuxGpuCompat()
+
+process.on('uncaughtException', (error) => {
+  errorLog('main', 'uncaughtException', error)
+})
+
+process.on('unhandledRejection', (reason) => {
+  errorLog('main', 'unhandledRejection', reason)
+})
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -201,6 +210,14 @@ function setSaveTagsMenuEnabled(enabled: boolean): void {
 }
 
 app.whenReady().then(() => {
+  debugLog('startup', 'app ready', {
+    electron: process.versions.electron,
+    node: process.versions.node,
+    platform: process.platform,
+    display: process.env.DISPLAY,
+    userData: app.getPath('userData')
+  })
+
   registerIpcHandlers(getMainWindow, () => {
     allowClose = true
     mainWindow?.close()

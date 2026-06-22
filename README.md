@@ -286,6 +286,32 @@ npm run dev
 
 The terminal must show `Using preload script: .../out/preload/index.mjs` and must **not** show `Preload failed`.
 
+**App freezes with a “Copy” / “Close” error dialog (empty message)**
+
+Electron on Linux shows this broken modal when an IPC handler **throws** (often a CSV parse error on `file:get-rows`). Current builds:
+
+- Never throw from IPC handlers (errors go to the terminal as `[ETV]` lines)
+- Use relaxed CSV parsing plus a Super-timeline fallback parser
+- Skip row loads until indexing has finished
+
+After `git pull`, run with debug logging and watch the terminal while opening a file:
+
+```bash
+ETV_DEBUG=1 npm run dev
+```
+
+You should see lines like:
+
+```text
+[ETV] open: begin /path/to/FILESYSTEM.csv
+[ETV] open: detected format filesystem
+[ETV] index: starting worker ...
+[ETV] open: indexed FILESYSTEM.csv
+[ETV] ipc: → file:get-rows
+```
+
+If something fails, paste the `[ETV] ... FAILED` lines (not just the `libva` line).
+
 **App freezes with a “Copy” / “Close” error dialog when opening a Super CSV**  
 Usually a row-parse failure on Sysmon/XML `message` fields (unquoted embedded `"` characters). Current builds use relaxed CSV parsing for Plaso exports. Update, `rm -rf out`, and `npm run dev`. If a row still fails, check the terminal for `file:get-rows failed` — the grid will stay responsive instead of locking the window.
 

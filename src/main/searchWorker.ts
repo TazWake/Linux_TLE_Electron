@@ -10,6 +10,7 @@ interface SearchInput {
   rowCount: number
   columnIndex: number
   termLower: string
+  columnCount: number
 }
 
 interface SearchProgress {
@@ -71,7 +72,7 @@ function runSearch(): void {
   try {
     for (let rowIndex = 0; rowIndex < input.rowCount; rowIndex++) {
       const line = readLineAtOffset(fd, offsets[rowIndex])
-      const cells = parseCsvLine(line)
+      const cells = parseCsvLine(line, input.columnCount)
 
       let found = false
       if (input.columnIndex < 0) {

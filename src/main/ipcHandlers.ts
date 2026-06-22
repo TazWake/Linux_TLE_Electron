@@ -20,6 +20,8 @@ import type {
 import { closeAllSessions, deleteSession, getSession, setSession } from './fileSession'
 import { readRows } from './fileReader'
 import { loadTags, saveTags } from './tagStore'
+import { debugLog, errorLog } from './debugLog'
+import { safeIpcHandle } from './safeIpc'
 
 function offsetsFromStrings(offsetStrings: string[] | undefined): BigInt64Array {
   if (!offsetStrings) {
@@ -62,6 +64,8 @@ async function indexFile(
   fileId: string,
   mainWindow: BrowserWindow
 ): Promise<{ offsets: BigInt64Array; rowCount: number }> {
+  debugLog('index', `starting worker for ${filePath}`, { fileId, worker: fileIndexerPath })
+
   return new Promise((resolve, reject) => {
     let settled = false
     const worker = new Worker(fileIndexerPath, {
@@ -95,6 +99,7 @@ async function indexFile(
         }
 
         resolve({ offsets, rowCount: complete.rowCount })
+        debugLog('index', `complete ${fileId}`, { rowCount: complete.rowCount })
       } else if (message.type === 'error') {
         settled = true
         reject(new Error((message as { message: string }).message))
@@ -103,10 +108,12 @@ async function indexFile(
 
     worker.on('error', (error) => {
       settled = true
+      errorLog('index', `worker error for ${fileId}`, error)
       reject(error)
     })
     worker.on('exit', (code) => {
       if (!settled && code !== 0) {
+        errorLog('index', `worker exited with code ${code} for ${fileId}`)
         reject(new Error(`Indexer worker exited with code ${code}`))
       }
     })
@@ -117,6 +124,8 @@ function beginOpenFile(
   filePath: string,
   mainWindow: BrowserWindow
 ): FileMetadata {
+  debugLog('open', `begin ${filePath}`)
+
   if (!fs.existsSync(filePath)) {
     throw new Error(`File not found: ${filePath}`)
   }
@@ -139,6 +148,8 @@ function beginOpenFile(
   const headers = parseHeaders(headerLine)
   const fileId = randomUUID()
   const fileName = path.basename(filePath)
+  debugLog('open', `detected format ${format}`, { fileName, columns: headers.length })
+
   const taggedRows = loadTags(filePath, fileName)
   const fd = fs.openSync(filePath, 'r')
 
@@ -163,9 +174,11 @@ function beginOpenFile(
       }
       session.offsets = offsets
       session.rowCount = rowCount
+      debugLog('open', `indexed ${fileName}`, { fileId, rowCount })
       mainWindow.webContents.send('file:index-complete', { fileId, rowCount })
     })
     .catch((error) => {
+      errorLog('open', `index failed for ${fileName}`, error)
       deleteSession(fileId)
       try {
         fs.closeSync(fd)
@@ -218,7 +231,8 @@ async function runSearch(
         offsets: offsetStrings,
         rowCount: session.rowCount,
         columnIndex,
-        termLower
+        termLower,
+        columnCount: session.headers.length
       }
     })
 
@@ -284,29 +298,43 @@ export function registerIpcHandlers(
   getMainWindow: () => BrowserWindow | null,
   confirmClose: () => void
 ): void {
+  debugLog('startup', 'registering IPC handlers', {
+    fileIndexerPath,
+    searchWorkerPath,
+    debug: process.env.ETV_DEBUG ?? 'auto'
+  })
+
   ipcMain.on('app:confirm-close', () => {
     closeAllSessions()
     confirmClose()
   })
 
-  ipcMain.handle('file:open', async () => {
+  safeIpcHandle('file:open', null, async () => {
     const mainWindow = getMainWindow()
     if (!mainWindow) {
+      errorLog('open', 'file:open called with no main window')
       return null
     }
 
     return pickAndOpenFile(mainWindow)
   })
 
-  ipcMain.handle('file:open-path', async (_event, filePath: string) => {
+  safeIpcHandle('file:open-path', null, async (_event, filePath: unknown) => {
     const mainWindow = getMainWindow()
     if (!mainWindow) {
-      throw new Error('Main window is not available')
+      errorLog('open', 'file:open-path called with no main window')
+      return null
+    }
+
+    if (typeof filePath !== 'string' || filePath.length === 0) {
+      errorLog('open', 'file:open-path received invalid path', filePath)
+      return null
     }
 
     try {
       return beginOpenFile(filePath, mainWindow)
     } catch (error) {
+      errorLog('open', `file:open-path failed for ${filePath}`, error)
       dialog.showErrorBox(
         'Unable to Open File',
         error instanceof Error ? error.message : String(error)
@@ -315,52 +343,83 @@ export function registerIpcHandlers(
     }
   })
 
-  ipcMain.handle('file:get-rows', async (_event, range: RowRange): Promise<RowData[]> => {
-    const session = getSession(range.fileId)
-    if (!session) {
-      console.error('file:get-rows: file session not found')
+  safeIpcHandle('file:get-rows', [], async (_event, range: unknown) => {
+    if (!range || typeof range !== 'object') {
+      errorLog('rows', 'file:get-rows received invalid range', range)
       return []
     }
 
-    try {
-      return readRows(session, range.startRow, range.endRow, range.rowIndexMap)
-    } catch (error) {
-      console.error('file:get-rows failed:', error)
+    const rowRange = range as RowRange
+    const session = getSession(rowRange.fileId)
+    if (!session) {
+      errorLog('rows', `no session for fileId ${rowRange.fileId}`)
       return []
     }
+
+    if (session.rowCount === 0 || session.offsets.length === 0) {
+      debugLog('rows', `session not ready ${rowRange.fileId}`, {
+        start: rowRange.startRow,
+        end: rowRange.endRow,
+        rowCount: session.rowCount
+      })
+      return []
+    }
+
+    return readRows(session, rowRange.startRow, rowRange.endRow, rowRange.rowIndexMap)
   })
 
-  ipcMain.handle('file:search', async (_event, request: SearchRequest) => {
+  safeIpcHandle('file:search', { matchingRowIndices: [] }, async (_event, request: unknown) => {
     const mainWindow = getMainWindow()
     if (!mainWindow) {
-      throw new Error('Main window is not available')
+      errorLog('search', 'file:search called with no main window')
+      return { matchingRowIndices: [] }
     }
 
-    if (!request.term.trim()) {
-      return { matchingRowIndices: [] } satisfies SearchResult
+    if (!request || typeof request !== 'object') {
+      errorLog('search', 'file:search received invalid request', request)
+      return { matchingRowIndices: [] }
     }
 
-    return runSearch(request, mainWindow)
+    const searchRequest = request as SearchRequest
+    if (!searchRequest.term.trim()) {
+      return { matchingRowIndices: [] }
+    }
+
+    return runSearch(searchRequest, mainWindow)
   })
 
-  ipcMain.handle('file:tag-update', async (_event, update: TagUpdate) => {
-    const session = getSession(update.fileId)
-    if (!session) {
-      throw new Error('File session not found')
+  safeIpcHandle('file:tag-update', undefined, async (_event, update: unknown) => {
+    if (!update || typeof update !== 'object') {
+      errorLog('tags', 'file:tag-update received invalid payload', update)
+      return
     }
 
-    if (update.tagged) {
-      session.taggedRows.add(update.rowIndex)
+    const tagUpdate = update as TagUpdate
+    const session = getSession(tagUpdate.fileId)
+    if (!session) {
+      errorLog('tags', `no session for fileId ${tagUpdate.fileId}`)
+      return
+    }
+
+    if (tagUpdate.tagged) {
+      session.taggedRows.add(tagUpdate.rowIndex)
     } else {
-      session.taggedRows.delete(update.rowIndex)
+      session.taggedRows.delete(tagUpdate.rowIndex)
     }
     session.tagsDirty = true
   })
 
-  ipcMain.handle('file:save-tags', async (_event, request: SaveTagsRequest) => {
-    const session = getSession(request.fileId)
+  safeIpcHandle('file:save-tags', false, async (_event, request: unknown) => {
+    if (!request || typeof request !== 'object') {
+      errorLog('tags', 'file:save-tags received invalid request', request)
+      return false
+    }
+
+    const saveRequest = request as SaveTagsRequest
+    const session = getSession(saveRequest.fileId)
     if (!session) {
-      throw new Error('File session not found')
+      errorLog('tags', `no session for fileId ${saveRequest.fileId}`)
+      return false
     }
 
     try {
@@ -368,6 +427,7 @@ export function registerIpcHandlers(
       session.tagsDirty = false
       return true
     } catch (error) {
+      errorLog('tags', 'save tags failed', error)
       dialog.showErrorBox(
         'Unable to Save Tags',
         error instanceof Error ? error.message : String(error)
@@ -376,11 +436,18 @@ export function registerIpcHandlers(
     }
   })
 
-  ipcMain.handle('file:close', async (_event, fileId: string) => {
+  safeIpcHandle('file:close', undefined, async (_event, fileId: unknown) => {
+    if (typeof fileId !== 'string') {
+      return
+    }
+
     const session = deleteSession(fileId)
     if (session) {
-      fs.closeSync(session.fd)
+      try {
+        fs.closeSync(session.fd)
+      } catch (error) {
+        errorLog('close', `failed to close fd for ${fileId}`, error)
+      }
     }
   })
-
 }
