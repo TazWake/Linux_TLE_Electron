@@ -54,7 +54,7 @@ These steps are for running on a Linux machine (native desktop or forensic VM su
 ### Prerequisites
 
 | Requirement | Notes |
-|-------------|--------|
+| --- | --- |
 | **Node.js 20.19+** (22 LTS recommended) | **Do not use the distro `node` package on SIFT/Ubuntu** — it is often Node 12. Install Node 22 with [nvm](https://github.com/nvm-sh/nvm) and the repo `.nvmrc` (`nvm install && nvm use`). |
 | **npm** 9+ | Bundled with Node from nvm. |
 | **Git** | To clone the repository. |
@@ -132,7 +132,7 @@ npm run smoke-test
 ## Build commands
 
 | Command | Output | Notes |
-|---------|--------|--------|
+| --- | --- | --- |
 | `npm run dev` | `out/` (dev build) | **Primary way to run the app.** Starts automatically. |
 | `npm run build:app` | `out/` only | Does not start the app — run `npm start` afterward. |
 | `npm start` | Uses existing `out/` | After `npm run build:app`. |
