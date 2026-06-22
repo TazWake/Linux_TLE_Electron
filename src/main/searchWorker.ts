@@ -36,7 +36,7 @@ function readLineAtOffset(fd: number, offset: bigint): string {
   let collected = ''
 
   while (true) {
-    const { bytesRead } = fs.readSync(fd, buffer, 0, buffer.length, Number(position))
+    const bytesRead = fs.readSync(fd, buffer, 0, buffer.length, Number(position))
     if (bytesRead === 0) {
       break
     }

@@ -71,6 +71,37 @@ function runBuildApp() {
   return true
 }
 
+function verifyIndexerWorker() {
+  console.log('\nValidating line indexer worker...')
+
+  const mainDir = path.join(root, 'out', 'main')
+  if (!fs.existsSync(mainDir)) {
+    fail('out/main missing — cannot test indexer')
+    return false
+  }
+
+  const workerFile = fs.readdirSync(mainDir).find((name) => name.startsWith('fileIndexer-'))
+  if (!workerFile) {
+    fail('fileIndexer worker bundle missing from out/main')
+    return false
+  }
+
+  const csvPath = path.join(root, 'test_files', 'FILESYSTEM.csv')
+
+  const result = spawnSync(process.execPath, [path.join(root, 'scripts', 'test-indexer.mjs'), csvPath], {
+    cwd: root,
+    encoding: 'utf8'
+  })
+
+  if (result.status !== 0) {
+    fail(`Indexer worker failed: ${(result.stdout + result.stderr).trim()}`)
+    return false
+  }
+
+  pass('Line indexer worker indexes FILESYSTEM.csv')
+  return true
+}
+
 function verifyBuildOutput() {
   const required = ['out/main/index.js', 'out/renderer/index.html']
   const preloadCandidates = [
@@ -281,6 +312,11 @@ async function main() {
   }
 
   ok = verifyBuildOutput()
+  if (!ok) {
+    process.exit(process.exitCode ?? 1)
+  }
+
+  ok = verifyIndexerWorker()
   if (!ok) {
     process.exit(process.exitCode ?? 1)
   }

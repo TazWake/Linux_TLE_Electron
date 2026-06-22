@@ -45,7 +45,7 @@ function readFirstLine(filePath: string): string {
   const fd = fs.openSync(filePath, 'r')
   try {
     const buffer = Buffer.alloc(65536)
-    const { bytesRead } = fs.readSync(fd, buffer, 0, buffer.length, 0)
+    const bytesRead = fs.readSync(fd, buffer, 0, buffer.length, 0)
     const text = buffer.subarray(0, bytesRead).toString('utf8')
     const newlineIndex = text.indexOf('\n')
     if (newlineIndex < 0) {

@@ -230,34 +230,41 @@ The repo includes a `.nvmrc` (22); from the project directory you can also run `
 
 Warnings alone do not mean install failed unless `npm install` exits with a non-zero code.
 
-**`npm warn deprecated` (rimraf, glob, inflight, boolean, etc.)**  
-These come from **transitive dev dependencies** of Electron and electron-builder (tools used to compile and package the app). They are **not** shipped in the AppImage or `.deb`, and they do not make the timeline viewer deliberately vulnerable.
+**`npm warn deprecated` (boolean, glob, etc.)**  
+These come from **transitive dev dependencies** of Electron and electron-builder (tools used to compile and package the app). They are **not** shipped in the AppImage or `.deb`.
 
-This project uses npm `overrides` to pull newer `rimraf` and `glob` releases where possible. You may still see a `boolean` deprecation warning from Electron’s download helper; that is expected and safe to ignore for local development.
+This project uses npm `overrides` to pull newer `rimraf`, `glob`, `form-data`, and `undici` where possible. You may still see a `boolean` or `glob` deprecation warning from Electron tooling; the `glob` author deprecates all releases below the latest — that is npm registry noise, not evidence your install is broken.
 
 A successful install ends with `Install complete.` from the postinstall script and an `audited N packages` summary — not with an error exit code.
 
 **`npm audit` reports high severity vulnerabilities**  
-These almost always refer to **build-time** packages, not runtime code in the packaged app. Fixing them often requires major Electron or electron-builder upgrades. Treat audit output as a maintenance signal for developers, not as a flaw in the GPL application users install.
+Most remaining findings refer to **Electron itself** (the desktop runtime used only while developing or packaging). Resolving them requires a major Electron upgrade and is tracked separately from application code. Overrides address several **build-tool** advisories (`form-data`, `undici`). Treat audit output as a maintenance signal for developers, not as a flaw in the GPL application users install. Do **not** run `npm audit fix --force` unless you intend to upgrade Electron major versions.
 
 **`npm warn allow-scripts` (npm 11+)**  
-npm is noting that install scripts (Electron, esbuild) were not pre-approved on your machine. Run `npm approve-scripts electron esbuild` if your environment requires it, or allow scripts when prompted. This is a local npm policy message, not an application error.
+npm is noting that install scripts (Electron, esbuild) were not pre-approved on your machine. Run `npm approve-scripts electron esbuild` if your environment requires it. This is a local npm policy message, not an application error.
 
-**App window opens but File → Open does nothing**  
-Restart with `npm run dev` after a clean `npm install`. Ensure `node_modules/electron/dist/electron` exists.
+**`libva error` / `atom_cache` messages when running `npm run dev`**  
+These come from Chromium/GPU drivers on Linux VMs or forensic workstations without VA-API. They are harmless noise; the app should still open if preload loaded correctly.
 
 **“Application API failed to load” on startup**  
-The preload script did not attach `window.api`. This often happens when a stale `out/preload/index.js` exists while the project uses `"type": "module"`. Fix:
+The preload script did not attach `window.api`. Remove stale build output and restart:
 
 ```bash
 rm -rf out
 npm run dev
 ```
 
-The terminal must show `Using preload script: .../out/preload/index.mjs` (or `index.cjs`) and must **not** show `require is not defined` or `Preload failed`.
+The terminal must show `Using preload script: .../out/preload/index.mjs` and must **not** show `Preload failed`.
 
 **“Unable to index file — Cannot convert undefined to a BigInt”**  
-Usually a worker path or offset transfer bug; fixed in current builds by resolving workers via electron-vite `?modulePath`. Update the repo and rebuild.
+Fixed in current builds (`fs.readSync` return value was mis-handled in indexer workers). Update the repo, remove stale output, and rebuild:
+
+```bash
+git pull
+rm -rf out node_modules
+npm install
+npm run dev
+```
 
 **Blank window after `npm start`**  
 Run `npm run build:app` first. `out/renderer/index.html` must exist.

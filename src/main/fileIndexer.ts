@@ -40,7 +40,7 @@ function runIndexer(): void {
     let lineCount = 0
 
     while (position < BigInt(fileSize)) {
-      const { bytesRead } = fs.readSync(fd, buffer, 0, chunkSize, Number(position))
+      const bytesRead = fs.readSync(fd, buffer, 0, chunkSize, Number(position))
       if (bytesRead === 0) {
         break
       }
