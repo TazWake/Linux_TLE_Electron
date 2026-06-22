@@ -8,7 +8,7 @@ import {
 import type { FileMetadata } from '../shared/types'
 import { CLIENT_SIDE_ROW_THRESHOLD } from '../shared/constants'
 import { createGridOptions, rowToGridRecord, type GridRowRecord } from './gridConfig'
-import { FieldDetailWindow } from './fieldDetailWindow'
+import { getFieldDetailWindow } from './fieldDetailWindow'
 import { logRenderer, logRendererError } from './rendererDebug'
 
 export class TimelineTab {
@@ -23,7 +23,7 @@ export class TimelineTab {
   private readonly clearButton: HTMLButtonElement
   private readonly onDirtyChange: () => void
   private readonly onStatusChange: (rows: number, matches: number | null) => void
-  private readonly fieldDetail = new FieldDetailWindow()
+  private readonly fieldDetail = getFieldDetailWindow()
 
   private gridApi: GridApi | null = null
   private matchIndices: number[] | null = null
@@ -31,6 +31,9 @@ export class TimelineTab {
   private indexing = true
   private fontSize = 13
   private useClientSideRowModel = true
+  private gridMountedAt = 0
+  /** Ignore double-clicks right after mount (file-dialog click often lands on the grid). */
+  private static readonly FIELD_DETAIL_GRACE_MS = 800
 
   constructor(
     metadata: FileMetadata,
@@ -146,7 +149,9 @@ export class TimelineTab {
     this.indexing = false
     this.useClientSideRowModel = this.metadata.rowCount <= CLIENT_SIDE_ROW_THRESHOLD
     this.loadingEl.hidden = true
+    this.loadingEl.style.display = 'none'
     this.gridBody.hidden = false
+    this.fieldDetail.hide()
     void this.mountGrid()
   }
 
@@ -181,10 +186,28 @@ export class TimelineTab {
     })
 
     const onCellDoubleClicked = (event: CellDoubleClickedEvent<GridRowRecord>) => {
-      if (!event.colDef?.headerName || event.value == null) {
+      if (Date.now() - this.gridMountedAt < TimelineTab.FIELD_DETAIL_GRACE_MS) {
         return
       }
-      this.fieldDetail.show(event.colDef.headerName, String(event.value))
+
+      const columnName = event.colDef?.headerName?.trim()
+      if (!columnName || !event.data) {
+        return
+      }
+
+      const field = event.colDef?.field
+      const rawValue =
+        field && typeof event.data[field] !== 'undefined'
+          ? String(event.data[field])
+          : event.value == null
+            ? ''
+            : String(event.value)
+
+      if (!rawValue.trim()) {
+        return
+      }
+
+      this.fieldDetail.show(columnName, rawValue)
     }
 
     const options = createGridOptions(
@@ -218,6 +241,8 @@ export class TimelineTab {
 
       this.gridApi = createGrid(this.gridHost, options)
       this.gridHost.style.fontSize = `${this.fontSize}px`
+      this.gridMountedAt = Date.now()
+      this.fieldDetail.hide()
       logRenderer('grid', `mounted ${this.metadata.fileName}`)
     } catch (error) {
       logRendererError('grid', `createGrid failed for ${this.metadata.fileName}`, error)
@@ -367,6 +392,7 @@ export class TimelineTab {
   }
 
   async destroy(): Promise<void> {
+    this.fieldDetail.hide()
     this.gridApi?.destroy()
     this.gridApi = null
     await window.api.closeFile(this.metadata.fileId)
