@@ -195,6 +195,19 @@ The repo includes a `.nvmrc` (22); from the project directory you can also run `
 
 Warnings alone do not mean install failed unless `npm install` exits with a non-zero code.
 
+**`npm warn deprecated` (rimraf, glob, inflight, boolean, etc.)**  
+These come from **transitive dev dependencies** of Electron and electron-builder (tools used to compile and package the app). They are **not** shipped in the AppImage or `.deb`, and they do not make the timeline viewer deliberately vulnerable.
+
+This project uses npm `overrides` to pull newer `rimraf` and `glob` releases where possible. You may still see a `boolean` deprecation warning from Electron’s download helper; that is expected and safe to ignore for local development.
+
+A successful install ends with `Install complete.` from the postinstall script and an `audited N packages` summary — not with an error exit code.
+
+**`npm audit` reports high severity vulnerabilities**  
+These almost always refer to **build-time** packages, not runtime code in the packaged app. Fixing them often requires major Electron or electron-builder upgrades. Treat audit output as a maintenance signal for developers, not as a flaw in the GPL application users install.
+
+**`npm warn allow-scripts` (npm 11+)**  
+npm is noting that install scripts (Electron, esbuild) were not pre-approved on your machine. Run `npm approve-scripts electron esbuild` if your environment requires it, or allow scripts when prompted. This is a local npm policy message, not an application error.
+
 **App window opens but File → Open does nothing**  
 Restart with `npm run dev` after a clean `npm install`. Ensure `node_modules/electron/dist/electron` exists.
 

@@ -19,7 +19,7 @@
     "start": "node scripts/clean-stale-preload.mjs && electron .",
     "preview": "electron-vite preview",
     "smoke-test": "node scripts/smoke-test.mjs",
-    "postinstall": "node node_modules/electron/install.js"
+    "postinstall": "node scripts/postinstall.mjs"
   },
   "dependencies": {
     "ag-grid-community": "^33.3.2",
@@ -32,5 +32,9 @@
     "electron-vite": "^3.1.0",
     "typescript": "^5.8.3",
     "vite": "^6.3.5"
+  },
+  "overrides": {
+    "rimraf": "^5.0.10",
+    "glob": "^10.4.5"
   }
 }
