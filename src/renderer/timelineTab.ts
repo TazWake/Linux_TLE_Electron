@@ -1,11 +1,13 @@
 import {
   createGrid,
+  type CellDoubleClickedEvent,
   type GridApi,
   type IDatasource,
   type IGetRowsParams
 } from 'ag-grid-community'
 import type { FileMetadata } from '../shared/types'
-import { createGridOptions, rowToGridRecord } from './gridConfig'
+import { CLIENT_SIDE_ROW_THRESHOLD } from '../shared/constants'
+import { createGridOptions, rowToGridRecord, type GridRowRecord } from './gridConfig'
 import { FieldDetailWindow } from './fieldDetailWindow'
 import { logRenderer, logRendererError } from './rendererDebug'
 
@@ -13,6 +15,7 @@ export class TimelineTab {
   readonly metadata: FileMetadata
   private readonly container: HTMLElement
   private readonly loadingEl: HTMLElement
+  private readonly gridBody: HTMLElement
   private readonly gridHost: HTMLElement
   private readonly columnSelect: HTMLSelectElement
   private readonly searchInput: HTMLInputElement
@@ -27,6 +30,7 @@ export class TimelineTab {
   private tagsDirty = false
   private indexing = true
   private fontSize = 13
+  private useClientSideRowModel = true
 
   constructor(
     metadata: FileMetadata,
@@ -86,11 +90,15 @@ export class TimelineTab {
     this.loadingEl.className = 'grid-loading'
     this.loadingEl.textContent = 'Indexing file… 0 lines indexed'
 
-    this.gridHost = document.createElement('div')
-    this.gridHost.className = 'ag-theme-quartz grid-host'
-    this.gridHost.hidden = true
+    this.gridBody = document.createElement('div')
+    this.gridBody.className = 'grid-body'
+    this.gridBody.hidden = true
 
-    this.container.append(toolbar, this.loadingEl, this.gridHost)
+    this.gridHost = document.createElement('div')
+    this.gridHost.className = 'grid-host'
+
+    this.gridBody.append(this.gridHost)
+    this.container.append(toolbar, this.loadingEl, this.gridBody)
     parent.append(this.container)
 
     this.onStatusChange(metadata.rowCount, null)
@@ -136,12 +144,10 @@ export class TimelineTab {
 
   finishIndexing(): void {
     this.indexing = false
+    this.useClientSideRowModel = this.metadata.rowCount <= CLIENT_SIDE_ROW_THRESHOLD
     this.loadingEl.hidden = true
-    this.gridHost.hidden = false
-    // Defer grid creation until layout has settled (avoids zero-height container on Linux).
-    requestAnimationFrame(() => {
-      this.mountGrid()
-    })
+    this.gridBody.hidden = false
+    void this.mountGrid()
   }
 
   setFontSize(size: number): void {
@@ -163,30 +169,53 @@ export class TimelineTab {
     this.refreshDatasource()
   }
 
-  private mountGrid(): void {
+  private async mountGrid(): Promise<void> {
     if (this.gridApi) {
       return
     }
 
     logRenderer('grid', `mounting ${this.metadata.fileName}`, {
       rowCount: this.metadata.rowCount,
-      columns: this.metadata.headers.length
+      columns: this.metadata.headers.length,
+      rowModel: this.useClientSideRowModel ? 'clientSide' : 'infinite'
     })
+
+    const onCellDoubleClicked = (event: CellDoubleClickedEvent<GridRowRecord>) => {
+      if (!event.colDef?.headerName || event.value == null) {
+        return
+      }
+      this.fieldDetail.show(event.colDef.headerName, String(event.value))
+    }
 
     const options = createGridOptions(
       this.metadata,
       (rowIndex, tagged) => void this.handleTagToggle(rowIndex, tagged),
-      (event) => {
-        if (!event.colDef?.headerName || event.value == null) {
-          return
-        }
-        this.fieldDetail.show(event.colDef.headerName, String(event.value))
-      }
+      onCellDoubleClicked,
+      this.useClientSideRowModel ? 'clientSide' : 'infinite'
     )
 
-    options.datasource = this.createDatasource()
-
     try {
+      if (this.useClientSideRowModel) {
+        const rows = await window.api.getRows({
+          fileId: this.metadata.fileId,
+          startRow: 0,
+          endRow: this.metadata.rowCount,
+          rowIndexMap: this.matchIndices ?? undefined
+        })
+        options.rowData = rows.map((row) =>
+          rowToGridRecord(
+            this.metadata.headers,
+            row.cells,
+            row.rowIndex,
+            row.tagged,
+            this.matchIndices !== null
+          )
+        )
+        logRenderer('grid', `loaded ${options.rowData.length} rows for client-side model`)
+      } else {
+        options.datasource = this.createDatasource()
+      }
+
       this.gridApi = createGrid(this.gridHost, options)
       this.gridHost.style.fontSize = `${this.fontSize}px`
       logRenderer('grid', `mounted ${this.metadata.fileName}`)
@@ -194,7 +223,7 @@ export class TimelineTab {
       logRendererError('grid', `createGrid failed for ${this.metadata.fileName}`, error)
       this.loadingEl.hidden = false
       this.loadingEl.textContent = 'Unable to display grid. See terminal for [ETV renderer] errors.'
-      this.gridHost.hidden = true
+      this.gridBody.hidden = true
     }
   }
 
@@ -239,8 +268,13 @@ export class TimelineTab {
         lastRow = 0
       }
 
-      params.successCallback(gridRows, lastRow)
-      logRenderer('grid', `rows ${startRow}-${endRow}`, { returned: gridRows.length, lastRow })
+      try {
+        params.successCallback(gridRows, lastRow)
+        logRenderer('grid', `rows ${startRow}-${endRow}`, { returned: gridRows.length, lastRow })
+      } catch (error) {
+        logRendererError('grid', 'successCallback failed', error)
+        params.failCallback()
+      }
     } catch (error) {
       logRendererError('grid', 'fetchRows failed', error)
       params.failCallback()
@@ -251,9 +285,41 @@ export class TimelineTab {
     if (!this.gridApi) {
       return
     }
+
+    if (this.useClientSideRowModel) {
+      void this.reloadClientSideRows()
+      return
+    }
+
     this.gridApi.setGridOption('infiniteInitialRowCount', this.matchIndices?.length ?? this.metadata.rowCount)
     this.gridApi.setGridOption('datasource', this.createDatasource())
     this.gridApi.purgeInfiniteCache()
+  }
+
+  private async reloadClientSideRows(): Promise<void> {
+    if (!this.gridApi) {
+      return
+    }
+
+    const totalRows = this.matchIndices ? this.matchIndices.length : this.metadata.rowCount
+    const rows = await window.api.getRows({
+      fileId: this.metadata.fileId,
+      startRow: 0,
+      endRow: totalRows,
+      rowIndexMap: this.matchIndices ?? undefined
+    })
+
+    const gridRows = rows.map((row) =>
+      rowToGridRecord(
+        this.metadata.headers,
+        row.cells,
+        row.rowIndex,
+        row.tagged,
+        this.matchIndices !== null
+      )
+    )
+
+    this.gridApi.setGridOption('rowData', gridRows)
   }
 
   async runSearchWithTerm(term: string, column = 'All Columns'): Promise<void> {
@@ -271,7 +337,7 @@ export class TimelineTab {
 
     this.loadingEl.hidden = false
     this.loadingEl.textContent = 'Searching… 0 rows scanned'
-    this.gridHost.hidden = true
+    this.gridBody.hidden = true
 
     const result = await window.api.search({
       fileId: this.metadata.fileId,
@@ -282,10 +348,10 @@ export class TimelineTab {
     this.matchIndices = result.matchingRowIndices
     this.onStatusChange(this.metadata.rowCount, this.matchIndices.length)
     this.loadingEl.hidden = true
-    this.gridHost.hidden = false
+    this.gridBody.hidden = false
 
     if (!this.gridApi) {
-      this.mountGrid()
+      await this.mountGrid()
     } else {
       this.refreshDatasource()
     }

@@ -17,6 +17,7 @@ export class TabManager {
   private readonly onStatusChange: (rows: number, matches: number | null) => void
   private tabs: TabEntry[] = []
   private activeTabId: string | null = null
+  private readonly pendingIndexComplete = new Map<string, number>()
 
   constructor(
     tabBar: HTMLElement,
@@ -114,6 +115,12 @@ export class TabManager {
     this.tabs.push(entry)
     this.activateTab(metadata.fileId)
     this.onTabsChange()
+
+    const pendingRowCount = this.pendingIndexComplete.get(metadata.fileId)
+    if (pendingRowCount !== undefined) {
+      this.pendingIndexComplete.delete(metadata.fileId)
+      this.finishIndexing(metadata.fileId, pendingRowCount)
+    }
   }
 
   activateTab(tabId: string): void {
@@ -208,6 +215,7 @@ export class TabManager {
   finishIndexing(fileId: string, rowCount: number): void {
     const entry = this.tabs.find((tab) => tab.id === fileId)
     if (!entry) {
+      this.pendingIndexComplete.set(fileId, rowCount)
       return
     }
     entry.metadata.rowCount = rowCount

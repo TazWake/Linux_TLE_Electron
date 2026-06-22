@@ -6,6 +6,7 @@ import type {
   RowClassParams,
   RowStyle
 } from 'ag-grid-community'
+import { themeQuartz } from 'ag-grid-community'
 import type { FileMetadata } from '../shared/types'
 
 const MESSAGE_PREVIEW_LENGTH = 200
@@ -144,15 +145,12 @@ export function getRowStyle(params: RowClassParams<GridRowRecord>): RowStyle | u
 export function createGridOptions(
   metadata: FileMetadata,
   onTagToggle: (rowIndex: number, tagged: boolean) => void,
-  onCellDoubleClicked: GridOptions<GridRowRecord>['onCellDoubleClicked']
+  onCellDoubleClicked: GridOptions<GridRowRecord>['onCellDoubleClicked'],
+  rowModelType: 'clientSide' | 'infinite' = 'infinite'
 ): GridOptions<GridRowRecord> {
-  return {
-    // v33 defaults to the new JS theme API; we import ag-theme-quartz.css (legacy CSS themes).
-    theme: 'legacy',
-    rowModelType: 'infinite',
-    cacheBlockSize: 100,
-    maxBlocksInCache: 20,
-    infiniteInitialRowCount: metadata.rowCount,
+  const base: GridOptions<GridRowRecord> = {
+    theme: themeQuartz,
+    rowModelType,
     columnDefs: buildColumnDefs(metadata, onTagToggle),
     defaultColDef: {
       resizable: true,
@@ -165,4 +163,15 @@ export function createGridOptions(
     onCellDoubleClicked,
     getRowStyle
   }
+
+  if (rowModelType === 'infinite') {
+    return {
+      ...base,
+      cacheBlockSize: 100,
+      maxBlocksInCache: 20,
+      infiniteInitialRowCount: metadata.rowCount
+    }
+  }
+
+  return base
 }

@@ -312,7 +312,7 @@ You should see lines like:
 
 If something fails, paste the `[ETV] ... FAILED` lines (not just the `libva` line).
 
-If `[ETV] ipc: ← file:get-rows ok` appears but the window still freezes, the failure is in the **renderer** (usually AG Grid). With `ETV_DEBUG=1`, DevTools opens automatically and the terminal shows `[ETV renderer]` lines. Current builds set `theme: 'legacy'` on AG Grid v33 because the UI imports the CSS theme files (`ag-theme-quartz`).
+If `[ETV] ipc: ← file:get-rows ok` appears but the window still freezes, the failure is in the **renderer** (usually AG Grid). With `ETV_DEBUG=1`, DevTools opens automatically and the terminal shows `[ETV] renderer:` lines (forwarded from the renderer process). Current builds use AG Grid v33’s **Theming API** (`themeQuartz`) without legacy CSS files, and load files with ≤50,000 rows via the **client-side** row model before creating the grid.
 
 **App freezes with a “Copy” / “Close” error dialog when opening a Super CSV**  
 Usually a row-parse failure on Sysmon/XML `message` fields (unquoted embedded `"` characters). Current builds use relaxed CSV parsing for Plaso exports. Update, `rm -rf out`, and `npm run dev`. If a row still fails, check the terminal for `file:get-rows failed` — the grid will stay responsive instead of locking the window.

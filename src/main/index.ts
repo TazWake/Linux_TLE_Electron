@@ -81,12 +81,6 @@ function createWindow(): void {
     errorLog('renderer', 'process gone', details)
   })
 
-  mainWindow.webContents.on('console-message', (_event, level, message, line, sourceId) => {
-    if (level >= 2 && message.includes('[ETV')) {
-      console.error(`[renderer] ${message} (${sourceId}:${line})`)
-    }
-  })
-
   if (process.env.ETV_DEBUG === '1') {
     mainWindow.webContents.openDevTools({ mode: 'detach' })
   }
@@ -239,6 +233,10 @@ app.whenReady().then(() => {
 
   ipcMain.on('renderer:error', (_event, scope: unknown, message: unknown) => {
     errorLog('renderer', String(scope), String(message))
+  })
+
+  ipcMain.on('renderer:log', (_event, scope: unknown, message: unknown) => {
+    debugLog('renderer', String(scope), String(message))
   })
 
   buildMenu()
