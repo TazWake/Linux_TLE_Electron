@@ -1,173 +1,221 @@
 # ElectronTimelineViewer
 
-GPL-licensed desktop timeline CSV viewer for Linux and Windows, built with Electron. It opens filesystem timelines and Plaso super timelines, supports large files via offset indexing, search, and row tagging.
+GPL-licensed desktop timeline CSV viewer for Linux. It opens **filesystem timelines** and **Plaso super timelines**, handles large CSVs via offset indexing, and provides search, scrolling, and row tagging.
 
-## Requirements
+---
 
-- **Node.js 20.19+** (22 LTS recommended). Node 18 is not supported for building this project.
-- npm 9+
+## Using the application
 
-Some dependencies (for example `electron-builder` and `@electron/rebuild`) declare stricter engine requirements. On Node 18 you will see `npm WARN EBADENGINE` messages during `npm install`. The install may still finish, but dev and packaging are unsupported on that version — upgrade Node before reporting build issues.
+Once the app is running (see [Build on Linux](#build-on-linux) below), you can work with timeline CSVs as follows.
 
-Check your version:
+### Open a timeline
+
+- **File → Open…** (Ctrl+O), or click the **+** tab button, or **drag and drop** a `.csv` file onto the window.
+- Two formats are supported (detected automatically from the header row):
+  - **Filesystem** — header starts with `Date,Size,Type,Mode,UID,GID,Meta,File Name`
+  - **Super / Plaso** — header starts with `datetime,timestamp_desc,source,source_long,message,parser,display_name,tag`
+- Sample files are in `test_files/FILESYSTEM.csv` and `test_files/SUPER.csv` for a first run.
+
+### Browse and inspect
+
+- Scroll the grid to move through rows (data is loaded in chunks; very large files are supported).
+- While a large file is indexing, the tab shows **Indexing file…** with a line count.
+- **Double-click** a cell to open a detail panel (JSON/XML in the `message` column is pretty-printed when possible).
+- **View** menu — increase, decrease, or reset font size.
+
+### Search
+
+- Choose a column (or **All Columns**), enter a term, and click **Search**.
+- Matching rows are highlighted; the status bar shows the match count.
+- **Clear** or **Search → Clear Search** restores the full file.
+- **Search → Search in All Tabs…** runs the same term across every open tab.
+
+### Tags (Super timelines only)
+
+- Use the **Tag** checkbox column on the right to mark rows.
+- Unsaved tag changes show a `*` on the tab title.
+- **File → Save Tags** (Ctrl+S) writes tags to your user data directory (see below).
+- **File → Close Tab** (Ctrl+W) or closing the window prompts if tags are unsaved.
+
+### Tag file location (Linux)
+
+Tags are stored as JSON alongside your user profile, typically:
+
+`~/.config/ElectronTimelineViewer/tags/<filename>.tags.json`
+
+---
+
+## Quick start (pre-built binary)
+
+If you only want to **use** the app, download a build from [GitHub Releases](https://github.com/TazWake/Linux_TLE_Electron/releases) — no Node.js required.
+
+**AppImage**
 
 ```bash
-node -v
+chmod +x ElectronTimelineViewer-*.AppImage
+./ElectronTimelineViewer-*.AppImage
 ```
 
-Upgrade options:
-
-- [nodejs.org](https://nodejs.org/) — install the current **22 LTS** build
-- [nvm](https://github.com/nvm-sh/nvm) — `nvm install 22 && nvm use 22` (uses the `.nvmrc` in this repo)
-- [fnm](https://github.com/Schniz/fnm) — `fnm install && fnm use`
-
-## Deployment (end users)
-
-Pre-built binaries are published on [GitHub Releases](https://github.com/TazWake/Linux_TLE_Electron/releases). Download the asset for your platform — no Node.js install required.
-
-### Windows
-
-1. Download `ElectronTimelineViewer-<version>.exe` from the latest release.
-2. Run the portable executable. No installer is required; you may place the file anywhere (for example `C:\Tools\`).
-3. Open a timeline CSV via **File → Open** or drag-and-drop onto the window.
-
-### Linux
-
-Linux builds (AppImage and `.deb`) are produced on a Linux host or WSL. When available on Releases:
-
-**AppImage**:
+**Debian / Ubuntu (.deb)**
 
 ```bash
-chmod +x ElectronTimelineViewer-<version>.AppImage
-./ElectronTimelineViewer-<version>.AppImage
-```
-
-**Debian/Ubuntu (.deb)**:
-
-```bash
-sudo dpkg -i electron-timeline-viewer_<version>_amd64.deb
+sudo dpkg -i electron-timeline-viewer_*_amd64.deb
 electron-timeline-viewer
 ```
 
-Tag files for Super timelines are stored under your user data directory (typically `~/.config/ElectronTimelineViewer/tags/` on Linux).
+---
 
-## Build from source (developers)
+## Build on Linux
 
-Clone the repository and install dependencies (use Node 20.19+ or 22 LTS):
+These steps are for building and running from source on a Linux machine (native or WSL).
 
-```powershell
+### Prerequisites
+
+| Requirement | Notes |
+|-------------|--------|
+| **Node.js 20.19+** (22 LTS recommended) | Node 18 is unsupported; you will see `npm WARN EBADENGINE` warnings. Check with `node -v`. Use [nvm](https://github.com/nvm-sh/nvm) and the repo `.nvmrc` (`nvm install && nvm use`). |
+| **npm** 9+ | Bundled with Node. |
+| **Git** | To clone the repository. |
+| **Build tools** (for packaging) | On Debian/Ubuntu: `sudo apt install -y fakeroot dpkg rpm squashfs-tools` (AppImage/deb targets). |
+
+### 1. Clone and install
+
+```bash
 git clone https://github.com/TazWake/Linux_TLE_Electron.git
 cd Linux_TLE_Electron
 npm install
 ```
 
-`npm WARN EBADENGINE` during install means your Node version is below what a dependency expects. Upgrade Node (see **Requirements** above); do not treat those lines as a failed install unless `npm install` exits with a non-zero code.
+If Electron’s binary did not download (error: *Electron failed to install correctly* or *Electron uninstall* when starting):
 
-If `npm run dev` reports **Electron failed to install correctly**, the Electron binary did not download (often because install scripts were blocked). Run:
-
-```powershell
+```bash
 node node_modules/electron/install.js
+```
+
+### Run the app
+
+You have three common paths. Pick one.
+
+#### A. Development mode (recommended while coding)
+
+Hot reload for the UI; rebuilds main/preload on change:
+
+```bash
 npm run dev
 ```
 
-### Development
+#### B. Production build in `out/`, run without packaging
 
-```powershell
-npm run dev
+`npm run build:app` **only compiles** TypeScript and bundles into `out/`. It does **not** produce a standalone AppImage or installable binary, and nothing in `out/` is executable on its own — you launch it with Electron from the project root:
+
+```bash
+npm run build:app
+npm start
 ```
 
-### Compile only
+Equivalent:
 
-```powershell
-npm run build:app   # output in out/
+```bash
+npm run build:app
+npm run preview
 ```
 
-### Package for distribution
+Both `npm start` and `npm run preview` load `out/main/index.js` (see `main` in `package.json`) and open the window. Use this to verify a production build before packaging.
 
-```powershell
-npm run build       # Windows: portable .exe in dist/
-npm run build:linux # Linux: AppImage and .deb in dist/ (requires Linux or WSL)
+**What `out/` contains**
+
+```text
+out/
+├── main/           # Main process + worker scripts (indexing, search)
+├── preload/        # Bridge exposed to the UI as window.api
+└── renderer/       # HTML, CSS, and bundled UI (AG Grid)
 ```
 
-Packaged output is written to `dist/` by default.
+#### C. Packaged installable build in `dist/`
 
-If a previous build left files locked on Windows, build to an alternate folder:
+Creates an AppImage and `.deb` you can copy to other machines:
 
-```powershell
-npx electron-builder --win portable --config.directories.output=release
+```bash
+npm run build:linux
 ```
 
-### Smoke test
+Output (names may include the version from `package.json`):
 
-After `npm install`, validate fixtures, compilation, and a brief application launch:
+```text
+dist/
+├── ElectronTimelineViewer-*.AppImage
+└── electron-timeline-viewer_*_amd64.deb
+```
 
-```powershell
+Run the AppImage or install the `.deb` as in [Quick start](#quick-start-pre-built-binary).
+
+On Windows, `npm run build` produces a portable `.exe` in `dist/` instead.
+
+### Smoke test (optional)
+
+Validates fixtures, compiles `out/`, and briefly launches Electron:
+
+```bash
 npm run smoke-test
 ```
 
-For the launch step, either the development Electron binary or a packaged executable (`release/` or `dist/`) must exist. Run `npm run build` first if the dev binary is missing.
+---
 
-## Publishing a release (maintainers)
+## Build outputs at a glance
 
-1. Bump `version` in `package.json` if needed.
-2. Run tests and smoke test:
+| Command | Output | How to run |
+|---------|--------|------------|
+| `npm run dev` | `out/` (dev build) | App starts automatically |
+| `npm run build:app` | `out/` only | **Does not start the app** — run `npm start` or `npm run preview` |
+| `npm run build:linux` | `dist/` (AppImage, `.deb`) | Run/install artifacts from `dist/` |
+| `npm start` | Uses existing `out/` | After `npm run build:app` |
 
-   ```powershell
-   npm run smoke-test
-   npm run build
-   ```
+---
 
-   On Linux, also run `npm run build:linux` and attach AppImage/deb assets.
+## Troubleshooting
 
-3. Commit and push with a signed commit:
+**`npm WARN EBADENGINE` during `npm install`**  
+Your Node version is too old. Upgrade to Node 20.19+ or 22 LTS, remove `node_modules`, and run `npm install` again. Warnings alone do not mean install failed unless npm exits with an error code.
 
-   ```powershell
-   git add .
-   git commit -S -m "Release v1.0.0"
-   git push origin main
-   ```
+**App window opens but File → Open does nothing**  
+Restart with `npm run dev` after a clean `npm install`. Ensure `node_modules/electron/dist/electron` exists.
 
-4. Tag and create a GitHub release with binaries:
+**Blank window after `npm start`**  
+Run `npm run build:app` first. `out/renderer/index.html` must exist.
 
-   ```powershell
-   git tag -s v1.0.0 -m "ElectronTimelineViewer v1.0.0"
-   git push origin v1.0.0
-   gh release create v1.0.0 "dist/ElectronTimelineViewer 1.0.0.exe" --title "v1.0.0" --notes "Initial release. Windows portable build."
-   ```
+**Packaging fails on Linux**  
+Install `fakeroot`, `dpkg`, and `squashfs-tools`. AppImage builds also need FUSE support on the host where you *run* the AppImage (not necessarily where you build it).
 
-Replace paths and notes as appropriate when adding Linux artifacts.
+---
 
 ## Features
 
-- Opens Plaso **Super** and **Filesystem** timeline CSV formats
-- Offset-based indexing for large files (up to 2 GB / 10 million rows)
+- Plaso **Super** and **Filesystem** timeline CSV formats
+- Offset indexing for large files (up to 2 GB / 10 million rows)
 - AG Grid infinite scroll with lazy row loading
-- Column-scoped search with match filtering and progress feedback
-- Super timeline row tagging persisted to `.tags.json` in userData
-- JSON/XML pretty-print in field detail popup (double-click a cell)
-
-## Project status
-
-Phases 1–5 from `PHASE.md` are implemented. Phase 6 packaging is complete for Windows; Linux release artifacts should be built on a Linux host before publishing.
+- Column-scoped search with match filtering
+- Super timeline row tagging (`.tags.json` in user data)
+- JSON/XML pretty-print in field detail popup
 
 ## Project layout
 
 ```text
 src/
   main/       # Electron main process, workers, IPC
-  preload/    # contextBridge API
-  renderer/   # UI (plain TypeScript + AG Grid)
-  shared/     # types and CSV utilities
-scripts/      # smoke-test.mjs, create-icon.ps1
-test_files/   # sample CSV fixtures
-resources/    # application icon (icon.png)
-PHASE.md      # phased build plan
+  preload/    # contextBridge API (window.api)
+  renderer/   # UI (TypeScript + AG Grid)
+  shared/     # Types and CSV utilities
+test_files/   # Sample FILESYSTEM.csv and SUPER.csv
+resources/    # Application icon
+out/          # Compiled app (after build:app) — launch with npm start
+dist/         # Packaged installers (after build:linux)
+PHASE.md      # Phased build plan
 ```
-
-## Test data
-
-Use `test_files/FILESYSTEM.csv` and `test_files/SUPER.csv` for initial validation.
 
 ## License
 
 GPL-3.0-or-later. See [LICENSE](LICENSE).
+
+## Windows builds
+
+Development and portable Windows builds are supported from the same repository. Use `npm run dev` and `npm run build` on Windows; see `electron-builder.yml` for targets. Linux packaging must be run on Linux or WSL (`npm run build:linux`).
