@@ -4,7 +4,10 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 import { hasUnsavedTags, closeAllSessions } from './fileSession'
 import { pickAndOpenFile, registerIpcHandlers } from './ipcHandlers'
+import { applyLinuxGpuCompat } from './linuxGpuCompat'
 import { resolvePreloadPath } from './paths'
+
+applyLinuxGpuCompat()
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -61,9 +64,25 @@ function createWindow(): void {
 
   console.log(`Using preload script: ${preloadPath}`)
 
+  mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription, url) => {
+    console.error(`Failed to load ${url}: ${errorCode} ${errorDescription}`)
+  })
+
+  mainWindow.webContents.on('render-process-gone', (_event, details) => {
+    console.error('Renderer process exited:', details)
+  })
+
   mainWindow.on('ready-to-show', () => {
     mainWindow?.show()
   })
+
+  // Some Linux VMs never emit ready-to-show when GPU compositing fails.
+  setTimeout(() => {
+    if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
+      console.warn('Forcing window visible after GPU/ready-to-show timeout')
+      mainWindow.show()
+    }
+  }, 3000)
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
     shell.openExternal(details.url)
@@ -199,6 +218,10 @@ app.whenReady().then(() => {
       createWindow()
     }
   })
+})
+
+app.on('child-process-gone', (_event, details) => {
+  console.error('Child process exited:', details)
 })
 
 app.on('window-all-closed', () => {

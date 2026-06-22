@@ -243,8 +243,38 @@ Most remaining findings refer to **Electron itself** (the desktop runtime used o
 **`npm warn allow-scripts` (npm 11+)**  
 npm is noting that install scripts (Electron, esbuild) were not pre-approved on your machine. Run `npm approve-scripts electron esbuild` if your environment requires it. This is a local npm policy message, not an application error.
 
-**`libva error` / `atom_cache` messages when running `npm run dev`**  
-These come from Chromium/GPU drivers on Linux VMs or forensic workstations without VA-API. They are harmless noise; the app should still open if preload loaded correctly.
+**`libva error` / app exits immediately after `Using preload script`**
+
+On SIFT and many forensic VMs, VA-API/GPU drivers are missing or broken. Chromium logs `libva error: vaGetDriverNameByIndex()` and may **quit before any window appears**, returning you to the shell prompt.
+
+Current builds disable hardware acceleration on Linux automatically. After `git pull`, try:
+
+```bash
+nvm use 22
+rm -rf out
+npm run dev
+```
+
+The terminal should **stay running** (no immediate shell prompt) and a window should open within a few seconds.
+
+If it still exits:
+
+```bash
+echo "$DISPLAY"
+ELECTRON_ENABLE_LOGGING=1 npm run dev
+```
+
+`echo "$DISPLAY"` must print something (e.g. `:0`) when using a local desktop session. Over plain SSH without X forwarding, Electron cannot open a window.
+
+To test GPU drivers are the issue, force software rendering:
+
+```bash
+LIBGL_ALWAYS_SOFTWARE=1 npm run dev
+```
+
+On a machine with working GPU drivers, you can re-enable acceleration with `ETV_ENABLE_GPU=1 npm run dev`.
+
+**`atom_cache` messages** — harmless Chromium log noise once the window is open.
 
 **“Application API failed to load” on startup**  
 The preload script did not attach `window.api`. Remove stale build output and restart:
