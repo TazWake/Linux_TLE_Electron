@@ -1,26 +1,28 @@
 # ElectronTimelineViewer
 
-GPL-licensed desktop timeline CSV viewer for Linux. It opens **filesystem timelines** and **Plaso super timelines**, handles large CSVs via offset indexing, and provides search, scrolling, and row tagging.
+GPL-licensed desktop timeline CSV viewer for Linux. It opens **filesystem timelines** and **Plaso super timelines**, indexes large CSVs via line offsets, and provides search, scrolling, and row tagging.
+
+**Project status (June 2026):** Active development. The supported way to run the app today is **from source** with `npm run dev` on Linux (including SIFT Workstation with Node 22 via nvm). Opening and browsing timeline CSVs in the grid is working on Linux VMs. **Packaged installers (AppImage, `.deb`) are not yet available** — `npm run build:linux` exists in the repo but has not been validated end-to-end.
 
 ---
 
 ## Using the application
 
-Once the app is running (see [Build on Linux](#build-on-linux) below), you can work with timeline CSVs as follows.
+Once the app is running (see [Run from source on Linux](#run-from-source-on-linux) below), you can work with timeline CSVs as follows.
 
 ### Open a timeline
 
-- **File → Open…** (Ctrl+O), or click the **+** tab button, or **drag and drop** a `.csv` file onto the window.
-- Two formats are supported (detected automatically from the header row):
-  - **Filesystem** — header starts with `Date,Size,Type,Mode,UID,GID,Meta,File Name`
-  - **Super / Plaso** — header starts with `datetime,timestamp_desc,source,source_long,message,parser,display_name,tag`
-- Sample files are in `test_files/FILESYSTEM.csv` and `test_files/SUPER.csv` for a first run.
+- **File → Open…** (Ctrl+O), click the **+** tab button, or **drag and drop** a `.csv` onto the window.
+- Two formats are detected automatically from the header row:
+  - **Filesystem** — `Date,Size,Type,Mode,UID,GID,Meta,File Name`
+  - **Super / Plaso** — `datetime,timestamp_desc,source,source_long,message,parser,display_name,tag`
+- Sample files: `test_files/FILESYSTEM.csv` and `test_files/SUPER.csv`.
 
 ### Browse and inspect
 
-- Scroll the grid to move through rows (data is loaded in chunks; very large files are supported).
-- While a large file is indexing, the tab shows **Indexing file…** with a line count.
-- **Double-click** a cell to open a detail panel (JSON/XML in the `message` column is pretty-printed when possible).
+- Scroll the grid to move through rows. Files with up to 50,000 rows load into a client-side grid; larger files use infinite scroll with chunked loading.
+- While indexing, the tab shows **Indexing file…** with a line count.
+- **Double-click** a cell (after the grid has finished loading) to open the field detail panel. JSON/XML in `message` columns is pretty-printed when possible.
 - **View** menu — increase, decrease, or reset font size.
 
 ### Search
@@ -39,44 +41,24 @@ Once the app is running (see [Build on Linux](#build-on-linux) below), you can w
 
 ### Tag file location (Linux)
 
-Tags are stored as JSON alongside your user profile, typically:
+Tags are stored as JSON under your user profile, typically:
 
-`~/.config/ElectronTimelineViewer/tags/<filename>.tags.json`
-
----
-
-## Quick start (pre-built binary)
-
-If you only want to **use** the app, download a build from [GitHub Releases](https://github.com/TazWake/Linux_TLE_Electron/releases) — no Node.js required.
-
-**AppImage**
-
-```bash
-chmod +x ElectronTimelineViewer-*.AppImage
-./ElectronTimelineViewer-*.AppImage
-```
-
-**Debian / Ubuntu (.deb)**
-
-```bash
-sudo dpkg -i electron-timeline-viewer_*_amd64.deb
-electron-timeline-viewer
-```
+`~/.config/electron-timeline-viewer/tags/<filename>.tags.json`
 
 ---
 
-## Build on Linux
+## Run from source on Linux
 
-These steps are for building and running from source on a Linux machine (native or WSL).
+These steps are for running on a Linux machine (native desktop or forensic VM such as SIFT).
 
 ### Prerequisites
 
 | Requirement | Notes |
 |-------------|--------|
-| **Node.js 20.19+** (22 LTS recommended) | **Do not use the distro `node` package on SIFT/Ubuntu** — it is often Node 12 (`node -v` shows `v12.x`). That is too old and `npm install` will fail. Install Node 22 with [nvm](https://github.com/nvm-sh/nvm) and the repo `.nvmrc` (`nvm install && nvm use`). |
+| **Node.js 20.19+** (22 LTS recommended) | **Do not use the distro `node` package on SIFT/Ubuntu** — it is often Node 12. Install Node 22 with [nvm](https://github.com/nvm-sh/nvm) and the repo `.nvmrc` (`nvm install && nvm use`). |
 | **npm** 9+ | Bundled with Node from nvm. |
 | **Git** | To clone the repository. |
-| **Build tools** (for packaging) | On Debian/Ubuntu: `sudo apt install -y fakeroot dpkg rpm squashfs-tools` (AppImage/deb targets). |
+| **Display** | A working desktop session (`echo "$DISPLAY"` should print e.g. `:0`). |
 
 **SIFT Workstation / Ubuntu:** check Node **before** `npm install`:
 
@@ -97,17 +79,13 @@ node -v                   # must be >= 20.19.0
 npm install
 ```
 
-If Electron’s binary did not download (error: *Electron failed to install correctly* or *Electron uninstall* when starting):
+If Electron’s binary did not download (error: *Electron failed to install correctly* when starting):
 
 ```bash
 node node_modules/electron/install.js
 ```
 
-### Run the app
-
-You have three common paths. Pick one.
-
-#### A. Development mode (recommended while coding)
+### 2. Run in development mode (recommended)
 
 Hot reload for the UI; rebuilds main/preload on change:
 
@@ -115,23 +93,22 @@ Hot reload for the UI; rebuilds main/preload on change:
 npm run dev
 ```
 
-#### B. Production build in `out/`, run without packaging
+For troubleshooting file open or grid issues, enable debug logging (also opens DevTools):
 
-`npm run build:app` **only compiles** TypeScript and bundles into `out/`. It does **not** produce a standalone AppImage or installable binary, and nothing in `out/` is executable on its own — you launch it with Electron from the project root:
+```bash
+ETV_DEBUG=1 npm run dev
+```
+
+Watch the terminal for `[ETV]` lines while opening a file.
+
+### 3. Production build in `out/` (optional)
+
+`npm run build:app` compiles TypeScript and bundles into `out/`. It does **not** produce a standalone installer. Launch with Electron from the project root:
 
 ```bash
 npm run build:app
 npm start
 ```
-
-Equivalent:
-
-```bash
-npm run build:app
-npm run preview
-```
-
-Both `npm start` and `npm run preview` load `out/main/index.js` (see `main` in `package.json`) and open the window. Use this to verify a production build before packaging.
 
 **What `out/` contains**
 
@@ -141,26 +118,6 @@ out/
 ├── preload/        # Bridge exposed to the UI as window.api
 └── renderer/       # HTML, CSS, and bundled UI (AG Grid)
 ```
-
-#### C. Packaged installable build in `dist/`
-
-Creates an AppImage and `.deb` you can copy to other machines:
-
-```bash
-npm run build:linux
-```
-
-Output (names may include the version from `package.json`):
-
-```text
-dist/
-├── ElectronTimelineViewer-*.AppImage
-└── electron-timeline-viewer_*_amd64.deb
-```
-
-Run the AppImage or install the `.deb` as in [Quick start](#quick-start-pre-built-binary).
-
-On Windows, `npm run build` produces a portable `.exe` in `dist/` instead.
 
 ### Smoke test (optional)
 
@@ -172,14 +129,17 @@ npm run smoke-test
 
 ---
 
-## Build outputs at a glance
+## Build commands
 
-| Command | Output | How to run |
-|---------|--------|------------|
-| `npm run dev` | `out/` (dev build) | App starts automatically |
-| `npm run build:app` | `out/` only | **Does not start the app** — run `npm start` or `npm run preview` |
-| `npm run build:linux` | `dist/` (AppImage, `.deb`) | Run/install artifacts from `dist/` |
-| `npm start` | Uses existing `out/` | After `npm run build:app` |
+| Command | Output | Notes |
+|---------|--------|--------|
+| `npm run dev` | `out/` (dev build) | **Primary way to run the app.** Starts automatically. |
+| `npm run build:app` | `out/` only | Does not start the app — run `npm start` afterward. |
+| `npm start` | Uses existing `out/` | After `npm run build:app`. |
+| `npm run smoke-test` | — | Fixture parse, build, brief Electron launch. |
+| `npm run build:linux` | `dist/` (intended) | **Not yet validated.** Packaging may fail; no release binaries are published yet. |
+
+On Windows, `npm run dev` and `npm run build:app` work for development; Linux is the primary target platform.
 
 ---
 
@@ -187,7 +147,7 @@ npm run smoke-test
 
 ### `SyntaxError: Unexpected token '?'` during `npm install`
 
-This almost always means **Node.js is too old** (common on SIFT Workstation: `node -v` shows `v12.22.9` from `/usr/bin/node`). Electron 35 and the build tools require **Node 20.19+**.
+This almost always means **Node.js is too old** (common on SIFT: `node -v` shows `v12.22.9` from `/usr/bin/node`). Electron 35 requires **Node 20.19+**.
 
 ```bash
 node -v
@@ -209,14 +169,9 @@ npm install
 
 The project `preinstall` script blocks install on unsupported Node and prints this guidance automatically.
 
-**`npm WARN EBADENGINE` during `npm install`**  
-Your Node version is too old (Node 18 is common on Ubuntu LTS). Check what you are running:
+### `npm WARN EBADENGINE` during `npm install`
 
-```bash
-node -v
-```
-
-You need **20.19+**; **22 LTS** is recommended. Upgrade with [nvm](https://github.com/nvm-sh/nvm), then reinstall dependencies:
+Your Node version is too old. You need **20.19+**; **22 LTS** is recommended:
 
 ```bash
 nvm install 22
@@ -228,26 +183,19 @@ npm install
 
 The repo includes a `.nvmrc` (22); from the project directory you can also run `nvm install && nvm use`.
 
-Warnings alone do not mean install failed unless `npm install` exits with a non-zero code.
+### `npm warn deprecated` (boolean, glob, etc.)
 
-**`npm warn deprecated` (boolean, glob, etc.)**  
-These come from **transitive dev dependencies** of Electron and electron-builder (tools used to compile and package the app). They are **not** shipped in the AppImage or `.deb`.
+These come from **transitive dev dependencies** of Electron and electron-builder. This project uses npm `overrides` to pull newer `rimraf`, `glob`, `form-data`, and `undici` where possible. You may still see deprecation warnings from Electron tooling — that is npm registry noise, not evidence your install is broken.
 
-This project uses npm `overrides` to pull newer `rimraf`, `glob`, `form-data`, and `undici` where possible. You may still see a `boolean` or `glob` deprecation warning from Electron tooling; the `glob` author deprecates all releases below the latest — that is npm registry noise, not evidence your install is broken.
+A successful install ends with `Install complete.` from the postinstall script.
 
-A successful install ends with `Install complete.` from the postinstall script and an `audited N packages` summary — not with an error exit code.
+### `npm audit` reports high severity vulnerabilities
 
-**`npm audit` reports high severity vulnerabilities**  
-Most remaining findings refer to **Electron itself** (the desktop runtime used only while developing or packaging). Resolving them requires a major Electron upgrade and is tracked separately from application code. Overrides address several **build-tool** advisories (`form-data`, `undici`). Treat audit output as a maintenance signal for developers, not as a flaw in the GPL application users install. Do **not** run `npm audit fix --force` unless you intend to upgrade Electron major versions.
+Most findings refer to **Electron itself** (the desktop runtime). Resolving them requires a major Electron upgrade. Do **not** run `npm audit fix --force` unless you intend to upgrade Electron major versions.
 
-**`npm warn allow-scripts` (npm 11+)**  
-npm is noting that install scripts (Electron, esbuild) were not pre-approved on your machine. Run `npm approve-scripts electron esbuild` if your environment requires it. This is a local npm policy message, not an application error.
+### `libva error` / app exits immediately after `Using preload script`
 
-**`libva error` / app exits immediately after `Using preload script`**
-
-On SIFT and many forensic VMs, VA-API/GPU drivers are missing or broken. Chromium logs `libva error: vaGetDriverNameByIndex()` and may **quit before any window appears**, returning you to the shell prompt.
-
-Current builds disable hardware acceleration on Linux automatically. After `git pull`, try:
+On SIFT and many forensic VMs, VA-API/GPU drivers are missing or broken. Current builds disable hardware acceleration on Linux automatically. After `git pull`:
 
 ```bash
 nvm use 22
@@ -255,7 +203,7 @@ rm -rf out
 npm run dev
 ```
 
-The terminal should **stay running** (no immediate shell prompt) and a window should open within a few seconds.
+The terminal should **stay running** and a window should open within a few seconds.
 
 If it still exits:
 
@@ -264,19 +212,20 @@ echo "$DISPLAY"
 ELECTRON_ENABLE_LOGGING=1 npm run dev
 ```
 
-`echo "$DISPLAY"` must print something (e.g. `:0`) when using a local desktop session. Over plain SSH without X forwarding, Electron cannot open a window.
+`echo "$DISPLAY"` must print something (e.g. `:0`) on a local desktop. Over plain SSH without X forwarding, Electron cannot open a window.
 
-To test GPU drivers are the issue, force software rendering:
+To force software rendering:
 
 ```bash
 LIBGL_ALWAYS_SOFTWARE=1 npm run dev
 ```
 
-On a machine with working GPU drivers, you can re-enable acceleration with `ETV_ENABLE_GPU=1 npm run dev`.
+On a machine with working GPU drivers, re-enable acceleration with `ETV_ENABLE_GPU=1 npm run dev`.
 
 **`atom_cache` messages** — harmless Chromium log noise once the window is open.
 
-**“Application API failed to load” on startup**  
+### “Application API failed to load” on startup
+
 The preload script did not attach `window.api`. Remove stale build output and restart:
 
 ```bash
@@ -286,39 +235,42 @@ npm run dev
 
 The terminal must show `Using preload script: .../out/preload/index.mjs` and must **not** show `Preload failed`.
 
-**App freezes with a “Copy” / “Close” error dialog (empty message)**
+### Blank popup with “Copy to Clipboard” / “Close” over the grid
 
-Electron on Linux shows this broken modal when an IPC handler **throws** (often a CSV parse error on `file:get-rows`). Current builds:
+This was the **field detail overlay** opening incorrectly (not an Electron crash). Current builds:
 
-- Never throw from IPC handlers (errors go to the terminal as `[ETV]` lines)
-- Use relaxed CSV parsing plus a Super-timeline fallback parser
-- Skip row loads until indexing has finished
+- Keep the overlay hidden until you **double-click** a cell with real content
+- Ignore accidental double-clicks for 800 ms after the grid mounts (file-dialog clicks often land on the grid)
+- Dismiss with **Close**, **Escape**, or a click on the dimmed backdrop
 
-After `git pull`, run with debug logging and watch the terminal while opening a file:
+If the grid loads but the overlay still appears, `git pull`, `rm -rf out`, and run with `ETV_DEBUG=1 npm run dev`. Paste any `[ETV] renderer:` lines from the terminal.
+
+### CSV open / grid issues
+
+Run with debug logging:
 
 ```bash
 ETV_DEBUG=1 npm run dev
 ```
 
-You should see lines like:
+Expected sequence when opening `test_files/FILESYSTEM.csv`:
 
 ```text
 [ETV] open: begin /path/to/FILESYSTEM.csv
 [ETV] open: detected format filesystem
 [ETV] index: starting worker ...
 [ETV] open: indexed FILESYSTEM.csv
+[ETV] renderer: grid mounting FILESYSTEM.csv
 [ETV] ipc: → file:get-rows
+[ETV] ipc: ← file:get-rows ok
+[ETV] renderer: grid mounted FILESYSTEM.csv
 ```
 
-If something fails, paste the `[ETV] ... FAILED` lines (not just the `libva` line).
+IPC handlers do not throw (errors log as `[ETV] ... FAILED`). Super-timeline rows with embedded XML quotes use relaxed CSV parsing plus a fallback parser.
 
-If `[ETV] ipc: ← file:get-rows ok` appears but the window still freezes, the failure is in the **renderer** (usually AG Grid). With `ETV_DEBUG=1`, DevTools opens automatically and the terminal shows `[ETV] renderer:` lines (forwarded from the renderer process). Current builds use AG Grid v33’s **Theming API** (`themeQuartz`) without legacy CSS files, and load files with ≤50,000 rows via the **client-side** row model before creating the grid.
+### “Unable to index file — Cannot convert undefined to a BigInt”
 
-**App freezes with a “Copy” / “Close” error dialog when opening a Super CSV**  
-Usually a row-parse failure on Sysmon/XML `message` fields (unquoted embedded `"` characters). Current builds use relaxed CSV parsing for Plaso exports. Update, `rm -rf out`, and `npm run dev`. If a row still fails, check the terminal for `file:get-rows failed` — the grid will stay responsive instead of locking the window.
-
-**“Unable to index file — Cannot convert undefined to a BigInt”**  
-Fixed in current builds (`fs.readSync` return value was mis-handled in indexer workers). Update the repo, remove stale output, and rebuild:
+Fixed in current builds. Update, remove stale output, and reinstall:
 
 ```bash
 git pull
@@ -327,11 +279,9 @@ npm install
 npm run dev
 ```
 
-**Blank window after `npm start`**  
-Run `npm run build:app` first. `out/renderer/index.html` must exist.
+### Blank window after `npm start`
 
-**Packaging fails on Linux**  
-Install `fakeroot`, `dpkg`, and `squashfs-tools`. AppImage builds also need FUSE support on the host where you *run* the AppImage (not necessarily where you build it).
+Run `npm run build:app` first. `out/renderer/index.html` must exist.
 
 ---
 
@@ -339,7 +289,7 @@ Install `fakeroot`, `dpkg`, and `squashfs-tools`. AppImage builds also need FUSE
 
 - Plaso **Super** and **Filesystem** timeline CSV formats
 - Offset indexing for large files (up to 2 GB / 10 million rows)
-- AG Grid infinite scroll with lazy row loading
+- AG Grid with client-side model (≤50,000 rows) or infinite scroll (larger files)
 - Column-scoped search with match filtering
 - Super timeline row tagging (`.tags.json` in user data)
 - JSON/XML pretty-print in field detail popup
@@ -355,7 +305,6 @@ src/
 test_files/   # Sample FILESYSTEM.csv and SUPER.csv
 resources/    # Application icon
 out/          # Compiled app (after build:app) — launch with npm start
-dist/         # Packaged installers (after build:linux)
 PHASE.md      # Phased build plan
 ```
 
@@ -363,6 +312,6 @@ PHASE.md      # Phased build plan
 
 GPL-3.0-or-later. See [LICENSE](LICENSE).
 
-## Windows builds
+## Windows development
 
-Development and portable Windows builds are supported from the same repository. Use `npm run dev` and `npm run build` on Windows; see `electron-builder.yml` for targets. Linux packaging must be run on Linux or WSL (`npm run build:linux`).
+The repository can be developed on Windows (`npm run dev`, `npm run build:app`). Linux is the primary deployment target. Packaging configuration lives in `electron-builder.yml` for when installer builds are ready.
