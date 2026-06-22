@@ -2,13 +2,37 @@
 
 GPL-licensed desktop timeline CSV viewer for Linux. It opens **filesystem timelines** and **Plaso super timelines**, indexes large CSVs via line offsets, and provides search, scrolling, and row tagging.
 
-**Project status (June 2026):** Active development. The supported way to run the app today is **from source** with `npm run dev` on Linux (including SIFT Workstation with Node 22 via nvm). Opening and browsing timeline CSVs in the grid is working on Linux VMs. **Packaged installers (AppImage, `.deb`) are not yet available** — `npm run build:linux` exists in the repo but has not been validated end-to-end.
+**Project status (June 2026):** Active development. **Linux AppImage and `.deb` packages** are published on [GitHub Releases](https://github.com/TazWake/Linux_TLE_Electron/releases) (no Node.js required). You can also run from source with `npm run dev` — useful on SIFT Workstation and for development.
+
+---
+
+## Install from a release (Linux)
+
+Download the latest release from [GitHub Releases](https://github.com/TazWake/Linux_TLE_Electron/releases). Each tagged release includes an **AppImage** and a **`.deb`** for `amd64`.
+
+**AppImage**
+
+```bash
+chmod +x ElectronTimelineViewer-*.AppImage
+./ElectronTimelineViewer-*.AppImage
+```
+
+AppImage execution requires [FUSE](https://github.com/AppImage/AppImageKit/wiki/FUSE) on the host where you run the app.
+
+**Debian / Ubuntu (.deb)**
+
+```bash
+sudo dpkg -i electron-timeline-viewer_*_amd64.deb
+electron-timeline-viewer
+```
+
+If the packaged app misbehaves, try a newer release or [run from source](#run-from-source-on-linux) with `ETV_DEBUG=1 npm run dev` and check the terminal for `[ETV]` lines.
 
 ---
 
 ## Using the application
 
-Once the app is running (see [Run from source on Linux](#run-from-source-on-linux) below), you can work with timeline CSVs as follows.
+Once the app is running (from a [release package](#install-from-a-release-linux) or [from source](#run-from-source-on-linux)), you can work with timeline CSVs as follows.
 
 ### Open a timeline
 
@@ -49,7 +73,7 @@ Tags are stored as JSON under your user profile, typically:
 
 ## Run from source on Linux
 
-These steps are for running on a Linux machine (native desktop or forensic VM such as SIFT).
+Use this path for development, SIFT Workstation troubleshooting, or if the release packages do not run on your host.
 
 ### Prerequisites
 
@@ -85,7 +109,7 @@ If Electron’s binary did not download (error: *Electron failed to install corr
 node node_modules/electron/install.js
 ```
 
-### 2. Run in development mode (recommended)
+### 2. Run in development mode
 
 Hot reload for the UI; rebuilds main/preload on change:
 
@@ -133,11 +157,13 @@ npm run smoke-test
 
 | Command | Output | Notes |
 | --- | --- | --- |
-| `npm run dev` | `out/` (dev build) | **Primary way to run the app.** Starts automatically. |
+| `npm run dev` | `out/` (dev build) | Development; starts automatically. |
 | `npm run build:app` | `out/` only | Does not start the app — run `npm start` afterward. |
 | `npm start` | Uses existing `out/` | After `npm run build:app`. |
 | `npm run smoke-test` | — | Fixture parse, build, brief Electron launch. |
-| `npm run build:linux` | `dist/` (intended) | **Not yet validated.** Packaging may fail; no release binaries are published yet. |
+| `npm run build:linux` | `dist/` | Local AppImage + `.deb` (same targets as CI releases). |
+
+Release builds are produced by the GitHub Actions workflow when a `v*` tag is pushed; artifacts are attached to the matching [release](https://github.com/TazWake/Linux_TLE_Electron/releases).
 
 On Windows, `npm run dev` and `npm run build:app` work for development; Linux is the primary target platform.
 
@@ -283,6 +309,12 @@ npm run dev
 
 Run `npm run build:app` first. `out/renderer/index.html` must exist.
 
+### Release AppImage or `.deb` will not start
+
+- **AppImage:** ensure FUSE is available (`libfuse2` on many Debian/Ubuntu systems).
+- **GPU / VM issues:** same as [libva error](#libva-error--app-exits-immediately-after-using-preload-script) — try `LIBGL_ALWAYS_SOFTWARE=1 ./ElectronTimelineViewer-*.AppImage` or run from source with `ETV_DEBUG=1 npm run dev`.
+- **`.deb`:** after install, launch `electron-timeline-viewer` from a terminal and note any errors.
+
 ---
 
 ## Features
@@ -305,6 +337,7 @@ src/
 test_files/   # Sample FILESYSTEM.csv and SUPER.csv
 resources/    # Application icon
 out/          # Compiled app (after build:app) — launch with npm start
+dist/         # Local packages (after build:linux)
 PHASE.md      # Phased build plan
 ```
 
@@ -314,4 +347,4 @@ GPL-3.0-or-later. See [LICENSE](LICENSE).
 
 ## Windows development
 
-The repository can be developed on Windows (`npm run dev`, `npm run build:app`). Linux is the primary deployment target. Packaging configuration lives in `electron-builder.yml` for when installer builds are ready.
+The repository can be developed on Windows (`npm run dev`, `npm run build:app`). Linux is the primary deployment target; release packages are built via `.github/workflows/release-linux.yml` and `electron-builder.yml`.
