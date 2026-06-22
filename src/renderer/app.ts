@@ -17,8 +17,12 @@ export class App {
 
   constructor() {
     if (!window.api) {
-      document.body.innerHTML =
-        '<p class="startup-error">Application API failed to load. Restart the app.</p>'
+      const detail =
+        'The preload script did not expose window.api. ' +
+        'Delete the out/ folder, run npm run dev again, and check the terminal for ' +
+        '"Using preload script" or "Preload failed".'
+      document.body.innerHTML = `<p class="startup-error">${detail}</p>`
+      console.error('window.api is undefined — preload did not load correctly.')
       return
     }
 

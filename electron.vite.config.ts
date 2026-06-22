@@ -9,8 +9,8 @@ export default defineConfig({
     build: {
       rollupOptions: {
         output: {
-          format: 'cjs',
-          entryFileNames: '[name].js'
+          format: 'es',
+          entryFileNames: '[name].mjs'
         }
       }
     }

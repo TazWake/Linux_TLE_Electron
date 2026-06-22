@@ -59,6 +59,8 @@ function createWindow(): void {
     console.error(`Preload failed (${failedPath}):`, error)
   })
 
+  console.log(`Using preload script: ${preloadPath}`)
+
   mainWindow.on('ready-to-show', () => {
     mainWindow?.show()
   })

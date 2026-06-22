@@ -12,11 +12,11 @@
     "node": ">=20.19.0"
   },
   "scripts": {
-    "dev": "electron-vite dev",
+    "dev": "node scripts/clean-stale-preload.mjs && electron-vite dev",
     "build": "electron-vite build && electron-builder",
     "build:linux": "electron-vite build && electron-builder --linux",
     "build:app": "electron-vite build",
-    "start": "electron .",
+    "start": "node scripts/clean-stale-preload.mjs && electron .",
     "preview": "electron-vite preview",
     "smoke-test": "node scripts/smoke-test.mjs",
     "postinstall": "node node_modules/electron/install.js"

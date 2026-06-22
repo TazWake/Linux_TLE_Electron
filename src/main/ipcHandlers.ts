@@ -21,10 +21,18 @@ import { closeAllSessions, deleteSession, getSession, setSession } from './fileS
 import { readRows } from './fileReader'
 import { loadTags, saveTags } from './tagStore'
 
-function offsetsFromStrings(offsetStrings: string[]): BigInt64Array {
+function offsetsFromStrings(offsetStrings: string[] | undefined): BigInt64Array {
+  if (!offsetStrings) {
+    throw new Error('Indexer returned no line offset data.')
+  }
+
   const offsets = new BigInt64Array(offsetStrings.length)
   for (let index = 0; index < offsetStrings.length; index++) {
-    offsets[index] = BigInt(offsetStrings[index])
+    const value = offsetStrings[index]
+    if (value === undefined) {
+      throw new Error(`Indexer returned an invalid offset at index ${index}.`)
+    }
+    offsets[index] = BigInt(value)
   }
   return offsets
 }
@@ -71,13 +79,22 @@ async function indexFile(
       } else if (message.type === 'complete') {
         settled = true
         const complete = message as {
-          offsets: string[]
+          offsets?: string[]
+          offsetsBuffer?: ArrayBuffer
           rowCount: number
         }
-        resolve({
-          offsets: offsetsFromStrings(complete.offsets),
-          rowCount: complete.rowCount
-        })
+
+        let offsets: BigInt64Array
+        if (complete.offsets) {
+          offsets = offsetsFromStrings(complete.offsets)
+        } else if (complete.offsetsBuffer) {
+          offsets = new BigInt64Array(complete.offsetsBuffer)
+        } else {
+          reject(new Error('Indexer returned no line offset data.'))
+          return
+        }
+
+        resolve({ offsets, rowCount: complete.rowCount })
       } else if (message.type === 'error') {
         settled = true
         reject(new Error((message as { message: string }).message))

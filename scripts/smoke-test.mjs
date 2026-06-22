@@ -74,7 +74,6 @@ function runBuildApp() {
 function verifyBuildOutput() {
   const required = ['out/main/index.js', 'out/renderer/index.html']
   const preloadCandidates = [
-    'out/preload/index.js',
     'out/preload/index.mjs',
     'out/preload/index.cjs'
   ]

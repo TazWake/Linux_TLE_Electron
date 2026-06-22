@@ -165,7 +165,12 @@ const api: ElectronApi = {
 }
 
 try {
-  contextBridge.exposeInMainWorld('api', api)
+  if (process.contextIsolated) {
+    contextBridge.exposeInMainWorld('api', api)
+  } else {
+    // Fallback when context isolation is disabled (should not happen in production).
+    ;(globalThis as unknown as { api: ElectronApi }).api = api
+  }
 } catch (error) {
   console.error('Failed to expose preload API:', error)
 }
