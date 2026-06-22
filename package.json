@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "description": "GPL-licensed forensic timeline CSV viewer for Linux (Electron)",
   "license": "GPL-3.0-or-later",
-  "author": "Linux_TLE_Electron contributors",
+  "author": "Taz Wake <t.wake@halkynconsulting.co.uk>",
+  "homepage": "https://github.com/TazWake/Linux_TLE_Electron",
+  "desktopName": "ElectronTimelineViewer",
   "main": "./out/main/index.js",
   "type": "module",
   "engines": {

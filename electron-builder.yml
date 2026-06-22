@@ -10,6 +10,8 @@ linux:
     - deb
   category: Utility
   icon: resources/icon.png
+  maintainer: Taz Wake <t.wake@halkynconsulting.co.uk>
+  syncDesktopName: true
 win:
   target: portable
   icon: resources/icon.png
