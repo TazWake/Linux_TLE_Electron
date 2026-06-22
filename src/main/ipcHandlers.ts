@@ -318,10 +318,16 @@ export function registerIpcHandlers(
   ipcMain.handle('file:get-rows', async (_event, range: RowRange): Promise<RowData[]> => {
     const session = getSession(range.fileId)
     if (!session) {
-      throw new Error('File session not found')
+      console.error('file:get-rows: file session not found')
+      return []
     }
 
-    return readRows(session, range.startRow, range.endRow, range.rowIndexMap)
+    try {
+      return readRows(session, range.startRow, range.endRow, range.rowIndexMap)
+    } catch (error) {
+      console.error('file:get-rows failed:', error)
+      return []
+    }
   })
 
   ipcMain.handle('file:search', async (_event, request: SearchRequest) => {

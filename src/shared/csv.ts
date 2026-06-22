@@ -2,6 +2,8 @@ import { parse } from 'csv-parse/sync'
 
 /**
  * Parse a single CSV record line using RFC 4180 rules.
+ * relax_quotes allows Plaso Super rows where the message field contains XML
+ * attribute quotes without RFC 4180 field quoting.
  */
 export function parseCsvLine(line: string): string[] {
   const trimmed = line.replace(/\r$/, '')
@@ -11,6 +13,7 @@ export function parseCsvLine(line: string): string[] {
 
   const records = parse(trimmed, {
     relax_column_count: true,
+    relax_quotes: true,
     skip_empty_lines: false,
     bom: true
   }) as string[][]

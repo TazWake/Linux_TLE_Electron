@@ -40,6 +40,7 @@ function readFirstLine(filePath) {
 function parseCsvLine(line) {
   const records = parse(line.replace(/\r$/, ''), {
     relax_column_count: true,
+    relax_quotes: true,
     skip_empty_lines: false,
     bom: true
   })
@@ -182,6 +183,17 @@ function verifyCsvFixtures() {
     return false
   }
   pass('SUPER.csv row parsing works')
+
+  const sysmonRow = parseCsvLine(superRows[3])
+  if (sysmonRow.length < 8) {
+    fail('SUPER.csv Sysmon/XML message row did not parse into expected columns')
+    return false
+  }
+  if (!sysmonRow[4].includes('<Event>')) {
+    fail('SUPER.csv Sysmon message field was truncated or misparsed')
+    return false
+  }
+  pass('SUPER.csv Sysmon/XML message row parsing works')
 
   return true
 }

@@ -256,6 +256,9 @@ npm run dev
 
 The terminal must show `Using preload script: .../out/preload/index.mjs` and must **not** show `Preload failed`.
 
+**App freezes with a “Copy” / “Close” error dialog when opening a Super CSV**  
+Usually a row-parse failure on Sysmon/XML `message` fields (unquoted embedded `"` characters). Current builds use relaxed CSV parsing for Plaso exports. Update, `rm -rf out`, and `npm run dev`. If a row still fails, check the terminal for `file:get-rows failed` — the grid will stay responsive instead of locking the window.
+
 **“Unable to index file — Cannot convert undefined to a BigInt”**  
 Fixed in current builds (`fs.readSync` return value was mis-handled in indexer workers). Update the repo, remove stale output, and rebuild:
 
