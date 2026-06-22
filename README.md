@@ -175,7 +175,25 @@ npm run smoke-test
 ## Troubleshooting
 
 **`npm WARN EBADENGINE` during `npm install`**  
-Your Node version is too old. Upgrade to Node 20.19+ or 22 LTS, remove `node_modules`, and run `npm install` again. Warnings alone do not mean install failed unless npm exits with an error code.
+Your Node version is too old (Node 18 is common on Ubuntu LTS). Check what you are running:
+
+```bash
+node -v
+```
+
+You need **20.19+**; **22 LTS** is recommended. Upgrade with [nvm](https://github.com/nvm-sh/nvm), then reinstall dependencies:
+
+```bash
+nvm install 22
+nvm use 22
+node -v
+rm -rf node_modules
+npm install
+```
+
+The repo includes a `.nvmrc` (22); from the project directory you can also run `nvm install && nvm use`.
+
+Warnings alone do not mean install failed unless `npm install` exits with a non-zero code.
 
 **App window opens but File → Open does nothing**  
 Restart with `npm run dev` after a clean `npm install`. Ensure `node_modules/electron/dist/electron` exists.
