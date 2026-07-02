@@ -19,7 +19,7 @@ chmod +x ElectronTimelineViewer-*.AppImage
 
 AppImage execution requires [FUSE](https://github.com/AppImage/AppImageKit/wiki/FUSE) on the host where you run the app.
 
-**Debian / Ubuntu (.deb)**: 
+**Debian / Ubuntu (.deb)**:
 
 ```bash
 sudo dpkg -i electron-timeline-viewer_*_amd64.deb
