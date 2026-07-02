@@ -1,8 +1,8 @@
 # ElectronTimelineViewer
 
-GPL-licensed desktop timeline CSV viewer for Linux. It opens **filesystem timelines** and **Plaso super timelines**, indexes large CSVs via line offsets, and provides search, scrolling, and row tagging.
+GPL-licensed desktop timeline CSV viewer for Linux, inspired by Eric Zimmerman's Timeline Explorer. It opens **filesystem timelines**, **Plaso super timelines** (including custom/dynamic column layouts), and **generic CSV files**, indexes large files via line offsets, and provides per-file and cross-file search, row tagging, cell copying, colour rules, and JSON/XML inspection.
 
-**Project status (June 2026):** Active development. **Linux AppImage and `.deb` packages** are published on [GitHub Releases](https://github.com/TazWake/Linux_TLE_Electron/releases) (no Node.js required). You can also run from source with `npm run dev` — useful on SIFT Workstation and for development.
+**Project status (July 2026):** Version 2 in active development. **Linux AppImage and `.deb` packages** are published on [GitHub Releases](https://github.com/TazWake/Linux_TLE_Electron/releases) (no Node.js required). You can also run from source with `npm run dev` — useful on SIFT Workstation and for development. Features deferred to version 3 are tracked in [ROADMAP.md](ROADMAP.md).
 
 ---
 
@@ -34,31 +34,35 @@ If the packaged app misbehaves, try a newer release or [run from source](#run-fr
 
 Once the app is running (from a [release package](#install-from-a-release-linux) or [from source](#run-from-source-on-linux)), you can work with timeline CSVs as follows.
 
-### Open a timeline
+### Open a timeline (or any CSV)
 
-- **File → Open…** (Ctrl+O), click the **+** tab button, or **drag and drop** a `.csv` onto the window.
-- Two formats are detected automatically from the header row:
-  - **Filesystem** — `Date,Size,Type,Mode,UID,GID,Meta,File Name`
-  - **Super / Plaso** — `datetime,timestamp_desc,source,source_long,message,parser,display_name,tag`
-- Sample files: `test_files/FILESYSTEM.csv` and `test_files/SUPER.csv`.
+- **File → Open…** (Ctrl+O), click the **+** tab button, or **drag and drop** a `.csv` onto the window. Multiple files can be open at once, each in its own tab.
+- The format is detected automatically from the header row:
+  - **Filesystem** — the mactime layout `Date,Size,Type,Mode,UID,GID,Meta,File Name`
+  - **Super / Plaso** — any header containing the core columns `datetime`, `timestamp_desc`, `source`, and `message`, in any order and with any extra columns (psort output headers are user-configurable)
+  - **Generic** — any other parseable CSV header with at least two columns; column names are taken directly from the file
+- Designed for files up to **2 GB / 10 million rows** each. Memory is bounded by the line-offset index (roughly 8 bytes per row per file).
+- Sample files in `test_files/`: `FILESYSTEM.csv`, `SUPER.csv`, `SUPER_DYNAMIC.csv`, and `GENERIC.csv`.
 
 ### Browse and inspect
 
 - Scroll the grid to move through rows. Files with up to 50,000 rows load into a client-side grid; larger files use infinite scroll with chunked loading.
 - While indexing, the tab shows **Indexing file…** with a line count.
-- **Double-click** a cell (after the grid has finished loading) to open the field detail panel. JSON/XML in `message` columns is pretty-printed when possible.
-- **View** menu — increase, decrease, or reset font size.
+- **Double-click** a cell (after the grid has finished loading) to open the field detail panel. JSON and XML are pretty-printed — including payloads **embedded inside surrounding text**, such as Sysmon-for-Linux `<Event>` documents inside journal messages.
+- **Right-click** a cell for **Copy Cell**, **Copy Row**, or **Copy Row with Headers** (tab-separated). **Ctrl+C** copies the focused cell.
+- **View** menu — increase, decrease, or reset font size. Row heights scale with the font.
+- **View → Date/Time Format** — display datetime columns as ISO seconds (default), ISO with sub-second (nanosecond-padded) precision, or the original file values. Display-only: values are reformatted by string manipulation and timezones are never shifted.
 
 ### Search
 
 - Choose a column (or **All Columns**), enter a term, and click **Search**.
 - Matching rows are highlighted; the status bar shows the match count.
 - **Clear** or **Search → Clear Search** restores the full file.
-- **Search → Search in All Tabs…** runs the same term across every open tab.
+- **Search → Find in All Files…** (Ctrl+Shift+F) searches every open file, shows per-file hit counts, and clicking a result jumps to that tab with the matches applied as its filter.
 
-### Tags (Super timelines only)
+### Tags (all formats)
 
-- Use the **Tag** checkbox column on the right to mark rows.
+- Every file gets a **Tag** checkbox column (pinned right). Super timelines reuse their existing `tag` column; other formats get a synthetic one.
 - Unsaved tag changes show a `*` on the tab title.
 - **File → Save Tags** (Ctrl+S) writes tags to your user data directory (see below).
 - **File → Close Tab** (Ctrl+W) or closing the window prompts if tags are unsaved.
@@ -68,6 +72,29 @@ Once the app is running (from a [release package](#install-from-a-release-linux)
 Tags are stored as JSON under your user profile, typically:
 
 `~/.config/electron-timeline-viewer/tags/<filename>.tags.json`
+
+### Colour rules
+
+Rows can be colour-coded from an XML rules file. On first run the app creates a commented example at:
+
+`~/.config/electron-timeline-viewer/colorrules.xml`
+
+```xml
+<ColorRules>
+  <Rule name="Deleted files" column="File Name" match="contains"
+        value="(deleted)" background="#ffe0e0"/>
+  <Rule name="Auth failures" column="*" match="regex"
+        value="authentication failure|failed password" background="#ffd7d7" foreground="#5c0000"/>
+</ColorRules>
+```
+
+- `column` is a header name (case-insensitive) or `*` for any column; `match` is `contains` (default), `equals`, or `regex`.
+- Rules apply in file order; the first match wins. Tagged rows and search highlighting take precedence.
+- Edit the file and use **View → Reload Colour Rules** to apply changes without restarting. Invalid rules are skipped and logged, never fatal.
+
+### Automation
+
+Every file operation goes through a typed command registry in the main process; the UI is just one client of it. See [docs/AUTOMATION.md](docs/AUTOMATION.md) for the command reference. An HTTP/MCP adapter on top of the same registry is planned for v3 ([ROADMAP.md](ROADMAP.md)).
 
 ---
 
@@ -145,7 +172,7 @@ out/
 
 ### Smoke test (optional)
 
-Validates fixtures, compiles `out/`, and briefly launches Electron:
+Compiles the shared modules and tests them directly (format detection, CSV fallback parsing, colour rules, embedded JSON/XML extraction), validates fixtures, builds `out/`, and briefly launches Electron:
 
 ```bash
 npm run smoke-test
@@ -317,28 +344,38 @@ Run `npm run build:app` first. `out/renderer/index.html` must exist.
 
 ---
 
-## Features
+## Features (v2)
 
-- Plaso **Super** and **Filesystem** timeline CSV formats
-- Offset indexing for large files (up to 2 GB / 10 million rows)
+- **Filesystem**, **Plaso Super** (fixed or dynamic columns), and **generic CSV** formats with headers taken from the file
+- Multiple files open simultaneously in tabs; offset indexing for large files (up to 2 GB / 10 million rows each)
 - AG Grid with client-side model (≤50,000 rows) or infinite scroll (larger files)
-- Column-scoped search with match filtering
-- Super timeline row tagging (`.tags.json` in user data)
-- JSON/XML pretty-print in field detail popup
+- Column-scoped search per file, plus **Find in All Files** with per-file hit counts and click-to-filter
+- Row tagging for every format (`.tags.json` in user data)
+- Cell/row copy via context menu and Ctrl+C
+- JSON/XML pretty-print in the field detail popup, including payloads embedded in surrounding text
+- Colour rules from `colorrules.xml` with live reload
+- Datetime display formats (ISO seconds, ISO sub-second, original) with no timezone shifting
+- Font size control with dynamic row heights
+- Typed command layer for automation ([docs/AUTOMATION.md](docs/AUTOMATION.md))
+
+Deferred to version 3 (HTTP/MCP API, session save/restore, export, rule editor GUI, column grouping, TSV/XLSX input): see [ROADMAP.md](ROADMAP.md).
 
 ## Project layout
 
 ```text
 src/
-  main/       # Electron main process, workers, IPC
+  main/       # Electron main process, workers, IPC wrappers
+    commands/ # Command registry — the automation surface
   preload/    # contextBridge API (window.api)
   renderer/   # UI (TypeScript + AG Grid)
-  shared/     # Types and CSV utilities
-test_files/   # Sample FILESYSTEM.csv and SUPER.csv
+  shared/     # Types, CSV utilities, colour rules, command schema
+docs/         # AUTOMATION.md — command layer reference
+test_files/   # Sample FILESYSTEM, SUPER, SUPER_DYNAMIC, GENERIC CSVs
 resources/    # Application icon
 out/          # Compiled app (after build:app) — launch with npm start
 dist/         # Local packages (after build:linux)
 PHASE.md      # Phased build plan
+ROADMAP.md    # Features deferred to version 3
 ```
 
 ## License

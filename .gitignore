@@ -35,5 +35,8 @@ desktop.ini
 # TypeScript cache
 *.tsbuildinfo
 
+# Smoke-test temp compilation of src/shared
+.smoke-shared/
+
 # Test artifacts (keep test_files/ source data)
 test_files/*.tags.json
