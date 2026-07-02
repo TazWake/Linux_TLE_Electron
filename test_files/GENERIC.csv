@@ -1,0 +1,5 @@
+Timestamp,Host,EventID,Message
+2024-01-15T10:00:01,web01,4624,An account was successfully logged on
+2024-01-15T10:00:05,web01,4625,"An account failed to log on, bad password"
+2024-01-15 10:01:00,db01,1102,The audit log was cleared
+2024-01-15T10:02:30,web01,7045,"A service was installed: {""name"":""updater"",""path"":""C:\\Windows\\Temp\\u.exe""}"

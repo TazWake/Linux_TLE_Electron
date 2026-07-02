@@ -37,25 +37,29 @@ export async function searchFile(request: SearchRequest): Promise<SearchResult> 
       }
     })
 
-    worker.on('message', (message: { type: string }) => {
-      if (message.type === 'progress') {
-        const progress = message as { fileId: string; linesIndexed: number }
-        emitEvent('file:index-progress', {
-          fileId: progress.fileId,
-          linesIndexed: progress.linesIndexed,
-          phase: 'searching'
-        })
-      } else if (message.type === 'complete') {
-        settled = true
-        resolve({
-          matchingRowIndices: (message as { matchingRowIndices: number[] })
-            .matchingRowIndices
-        })
-      } else if (message.type === 'error') {
-        settled = true
-        reject(new Error((message as { message: string }).message))
+    worker.on(
+      'message',
+      (
+        message:
+          | { type: 'progress'; fileId: string; linesIndexed: number }
+          | { type: 'complete'; matchingRowIndices: number[] }
+          | { type: 'error'; message: string }
+      ) => {
+        if (message.type === 'progress') {
+          emitEvent('file:index-progress', {
+            fileId: message.fileId,
+            linesIndexed: message.linesIndexed,
+            phase: 'searching'
+          })
+        } else if (message.type === 'complete') {
+          settled = true
+          resolve({ matchingRowIndices: message.matchingRowIndices })
+        } else if (message.type === 'error') {
+          settled = true
+          reject(new Error(message.message))
+        }
       }
-    })
+    )
 
     worker.on('error', (error) => {
       settled = true

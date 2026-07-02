@@ -1,0 +1,5 @@
+datetime,timestamp_desc,source,source_long,message,parser,display_name,tag,hostname,username
+2023-03-15T00:00:20.123456+00:00,Content Modification Time,FILE,OS ctime,/var/log/auth.log type: file,filestat,OS:/var/log/auth.log,,web01,root
+2023-03-15T00:01:12.000000+00:00,Creation Time,LOG,Syslog,"session opened for user root by (uid=0)",syslog,OS:/var/log/auth.log,,web01,root
+2023-03-15T00:02:44.500000+00:00,Event Time,EVT,Sysmon,"Process created <Event><System><EventID>1</EventID></System><EventData><Data Name=""Image"">/usr/bin/nc</Data><Data Name=""CommandLine"">nc -lvp 4444</Data></EventData></Event>",sysmon,journal:/var/log/journal,,web01,attacker
+2023-03-15T00:03:10.750000+00:00,Content Modification Time,WEBHIST,Firefox History,https://example.test/download visited,sqlite/firefox_history,places.sqlite,suspicious,web01,analyst

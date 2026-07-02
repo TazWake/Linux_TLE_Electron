@@ -5,7 +5,7 @@ export interface FileMetadata {
   fileId: string
   filePath: string
   fileName: string
-  format: 'filesystem' | 'super'
+  format: 'filesystem' | 'super' | 'generic'
   headers: string[]
   rowCount: number
   indexing?: boolean

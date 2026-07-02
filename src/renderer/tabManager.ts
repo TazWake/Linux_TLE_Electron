@@ -15,6 +15,7 @@ export class TabManager {
   private readonly addButton: HTMLButtonElement
   private readonly onTabsChange: () => void
   private readonly onStatusChange: (rows: number, matches: number | null) => void
+  private readonly getFontSize?: () => number
   private tabs: TabEntry[] = []
   private activeTabId: string | null = null
   private readonly pendingIndexComplete = new Map<string, number>()
@@ -24,13 +25,15 @@ export class TabManager {
     tabContent: HTMLElement,
     addButton: HTMLButtonElement,
     onTabsChange: () => void,
-    onStatusChange: (rows: number, matches: number | null) => void
+    onStatusChange: (rows: number, matches: number | null) => void,
+    getFontSize?: () => number
   ) {
     this.tabBar = tabBar
     this.tabContent = tabContent
     this.addButton = addButton
     this.onTabsChange = onTabsChange
     this.onStatusChange = onStatusChange
+    this.getFontSize = getFontSize
 
     this.addButton.addEventListener('click', () => void this.openFile())
   }
@@ -42,6 +45,10 @@ export class TabManager {
 
   getTabs(): TimelineTab[] {
     return this.tabs.map((entry) => entry.tab)
+  }
+
+  getTabById(fileId: string): TimelineTab | null {
+    return this.tabs.find((entry) => entry.id === fileId)?.tab ?? null
   }
 
   hasUnsavedTabs(): TimelineTab[] {
@@ -79,6 +86,10 @@ export class TabManager {
       this.updateTabTitles()
       this.onTabsChange()
     }, this.onStatusChange)
+
+    if (this.getFontSize) {
+      tab.setFontSize(this.getFontSize())
+    }
 
     const tabButton = document.createElement('button')
     tabButton.type = 'button'

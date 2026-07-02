@@ -1,6 +1,6 @@
 {
   "name": "electron-timeline-viewer",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "GPL-licensed forensic timeline CSV viewer for Linux (Electron)",
   "license": "GPL-3.0-or-later",
   "author": "Taz Wake <t.wake@halkynconsulting.co.uk>",

@@ -278,3 +278,141 @@ body {
   background: #ffebe9;
   color: #82071e;
 }
+
+.cell-context-menu {
+  position: fixed;
+  z-index: 1300;
+  min-width: 180px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+}
+
+.cell-context-menu button {
+  font: inherit;
+  text-align: left;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.cell-context-menu button:hover,
+.cell-context-menu button:focus {
+  background: #f0f3f6;
+  outline: none;
+}
+
+.find-all-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  display: none;
+  place-items: center;
+  z-index: 1200;
+}
+
+.find-all-overlay.is-open {
+  display: grid;
+}
+
+.find-all-panel {
+  width: min(560px, 92vw);
+  max-height: 70vh;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.find-all-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.find-all-header h2 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.find-all-header button,
+.find-all-controls button {
+  font: inherit;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: #f6f8fa;
+  cursor: pointer;
+}
+
+.find-all-controls {
+  display: flex;
+  gap: 8px;
+  padding: 12px;
+}
+
+.find-all-controls input {
+  flex: 1;
+  font: inherit;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.find-all-status {
+  margin: 0;
+  padding: 0 12px 8px;
+  font-size: 12px;
+  color: #57606a;
+}
+
+.find-all-results {
+  list-style: none;
+  margin: 0;
+  padding: 0 12px 12px;
+  overflow: auto;
+}
+
+.find-all-results li + li {
+  margin-top: 4px;
+}
+
+.find-all-results button {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font: inherit;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.find-all-results button:hover:not(:disabled),
+.find-all-results button:focus:not(:disabled) {
+  background: #f0f6ff;
+  outline: none;
+}
+
+.find-all-results button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.find-all-count {
+  color: #57606a;
+  white-space: nowrap;
+}

@@ -53,6 +53,11 @@ function sendProgress(event: IndexProgressEvent): void {
   emitEvent('file:index-progress', event)
 }
 
+type IndexerWorkerMessage =
+  | { type: 'progress'; fileId: string; linesIndexed: number }
+  | { type: 'complete'; offsets?: string[]; offsetsBuffer?: ArrayBuffer; rowCount: number }
+  | { type: 'error'; message: string }
+
 async function indexFile(
   filePath: string,
   fileId: string
@@ -65,37 +70,31 @@ async function indexFile(
       workerData: { filePath, fileId }
     })
 
-    worker.on('message', (message: { type: string }) => {
+    worker.on('message', (message: IndexerWorkerMessage) => {
       if (message.type === 'progress') {
-        const progress = message as { fileId: string; linesIndexed: number }
         sendProgress({
-          fileId: progress.fileId,
-          linesIndexed: progress.linesIndexed,
+          fileId: message.fileId,
+          linesIndexed: message.linesIndexed,
           phase: 'indexing'
         })
       } else if (message.type === 'complete') {
         settled = true
-        const complete = message as {
-          offsets?: string[]
-          offsetsBuffer?: ArrayBuffer
-          rowCount: number
-        }
 
         let offsets: BigInt64Array
-        if (complete.offsets) {
-          offsets = offsetsFromStrings(complete.offsets)
-        } else if (complete.offsetsBuffer) {
-          offsets = new BigInt64Array(complete.offsetsBuffer)
+        if (message.offsets) {
+          offsets = offsetsFromStrings(message.offsets)
+        } else if (message.offsetsBuffer) {
+          offsets = new BigInt64Array(message.offsetsBuffer)
         } else {
           reject(new Error('Indexer returned no line offset data.'))
           return
         }
 
-        resolve({ offsets, rowCount: complete.rowCount })
-        debugLog('index', `complete ${fileId}`, { rowCount: complete.rowCount })
+        resolve({ offsets, rowCount: message.rowCount })
+        debugLog('index', `complete ${fileId}`, { rowCount: message.rowCount })
       } else if (message.type === 'error') {
         settled = true
-        reject(new Error((message as { message: string }).message))
+        reject(new Error(message.message))
       }
     })
 

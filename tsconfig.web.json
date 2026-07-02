@@ -4,6 +4,7 @@
     "strict": true,
     "module": "ESNext",
     "moduleResolution": "bundler",
+    "skipLibCheck": true,
     "lib": ["ESNext", "DOM", "DOM.Iterable"],
     "jsx": "preserve",
     "baseUrl": ".",

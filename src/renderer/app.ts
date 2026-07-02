@@ -1,5 +1,8 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 import { TabManager } from './tabManager'
+import { FindAllDialog } from './findAllDialog'
+import { loadColorRules } from './colorRules'
+import { setDatetimeMode, type DatetimeMode } from './datetimeFormat'
 
 const DEFAULT_FONT_SIZE = 13
 const MIN_FONT_SIZE = 10
@@ -13,6 +16,7 @@ export class App {
   private readonly statusMatches!: HTMLElement
   private readonly windowTitleBase = 'ElectronTimelineViewer'
   private readonly tabManager!: TabManager
+  private findAllDialog!: FindAllDialog
   private fontSize = DEFAULT_FONT_SIZE
 
   constructor() {
@@ -37,13 +41,25 @@ export class App {
       this.tabContent,
       this.addTabButton,
       () => this.updateChrome(),
-      (rows, matches) => this.updateStatus(rows, matches)
+      (rows, matches) => this.updateStatus(rows, matches),
+      () => this.fontSize
+    )
+
+    this.findAllDialog = new FindAllDialog(
+      (term) => window.api.searchAll(term),
+      (summary, term) => {
+        this.tabManager.activateTab(summary.fileId)
+        const tab = this.tabManager.getTabById(summary.fileId)
+        void tab?.applySearchResult(term, summary.matchingRowIndices)
+      }
     )
 
     this.registerIpcListeners()
     this.registerMenuListeners()
     this.registerDragAndDrop()
     this.updateChrome()
+
+    void loadColorRules()
 
     window.api.onCloseRequest(() => {
       void this.handleCloseRequest()
@@ -93,13 +109,39 @@ export class App {
           this.tabManager.getActiveTab()?.focusSearch()
           break
         case 'search-all':
-          void this.searchAllTabs()
+          this.findAllDialog.open()
           break
         case 'clear-search':
           this.tabManager.getActiveTab()?.clearSearch()
           break
+        case 'reload-color-rules':
+          void this.reloadColorRules()
+          break
+        case 'datetime-iso':
+          this.setDatetimeFormat('iso-seconds')
+          break
+        case 'datetime-subseconds':
+          this.setDatetimeFormat('iso-subseconds')
+          break
+        case 'datetime-original':
+          this.setDatetimeFormat('original')
+          break
       }
     })
+  }
+
+  private async reloadColorRules(): Promise<void> {
+    await loadColorRules()
+    for (const tab of this.tabManager.getTabs()) {
+      tab.redrawRows()
+    }
+  }
+
+  private setDatetimeFormat(mode: DatetimeMode): void {
+    setDatetimeMode(mode)
+    for (const tab of this.tabManager.getTabs()) {
+      tab.refreshFormatting()
+    }
   }
 
   private registerDragAndDrop(): void {
@@ -124,17 +166,6 @@ export class App {
     }
     await tab.saveTags()
     this.updateChrome()
-  }
-
-  private async searchAllTabs(): Promise<void> {
-    const term = window.prompt('Search all open tabs for:')
-    if (!term?.trim()) {
-      return
-    }
-
-    for (const tab of this.tabManager.getTabs()) {
-      await tab.runSearchWithTerm(term, 'All Columns')
-    }
   }
 
   private changeFontSize(delta: number): void {
