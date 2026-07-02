@@ -8,8 +8,25 @@ import type {
 } from 'ag-grid-community'
 import { themeQuartz } from 'ag-grid-community'
 import type { FileMetadata } from '../shared/types'
+import { evaluateColorRules } from './colorRules'
+import { getDatetimeFormatter, isDatetimeHeader } from './datetimeFormat'
 
 const MESSAGE_PREVIEW_LENGTH = 200
+
+/** Column names treated as free text: preview renderer + flexible width. */
+const MESSAGE_LIKE_HEADERS = new Set([
+  'message',
+  'desc',
+  'description',
+  'short',
+  'extra',
+  'payload',
+  'data',
+  'xml'
+])
+
+/** Column names treated as wide path/name columns. */
+const WIDE_HEADERS = new Set(['file name', 'filename', 'display_name', 'path', 'full path'])
 
 export interface GridRowRecord {
   rowIndex: number
@@ -70,45 +87,86 @@ class MessagePreviewRenderer implements ICellRendererComp {
   }
 }
 
-function fieldNameFromHeader(header: string): string {
+function sanitizeFieldName(header: string): string {
   return header.replace(/[^\w]+/g, '_')
+}
+
+/**
+ * Map CSV headers to unique AG Grid field names. Handles blank headers and
+ * collisions after sanitisation (e.g. "A B" and "A-B" both become A_B).
+ */
+export function fieldsFromHeaders(headers: string[]): string[] {
+  const seen = new Map<string, number>()
+  return headers.map((header, index) => {
+    let field = sanitizeFieldName(header.trim())
+    if (field.length === 0) {
+      field = `column_${index + 1}`
+    }
+    const count = seen.get(field) ?? 0
+    seen.set(field, count + 1)
+    return count === 0 ? field : `${field}_${count + 1}`
+  })
 }
 
 export function buildColumnDefs(
   metadata: FileMetadata,
   onTagToggle: (rowIndex: number, tagged: boolean) => void
 ): ColDef<GridRowRecord>[] {
-  return metadata.headers.map((header) => {
-    const field = fieldNameFromHeader(header)
+  const fields = fieldsFromHeaders(metadata.headers)
+  let hasTagColumn = false
+
+  const defs: ColDef<GridRowRecord>[] = metadata.headers.map((header, index) => {
+    const lowered = header.trim().toLowerCase()
     const colDef: ColDef<GridRowRecord> = {
-      field,
+      field: fields[index],
       headerName: header,
       minWidth: 120
     }
 
-    if (metadata.format === 'super' && header === 'tag') {
+    if (lowered === 'tag' && !hasTagColumn) {
+      hasTagColumn = true
       colDef.headerName = 'Tag'
       colDef.field = 'tagged'
       colDef.width = 60
+      colDef.minWidth = 60
       colDef.pinned = 'right'
       colDef.cellRenderer = TagCheckboxRenderer
       colDef.cellRendererParams = { onToggle: onTagToggle }
       colDef.valueGetter = (params) => params.data?.tagged ?? false
+      return colDef
     }
 
-    if (metadata.format === 'super' && header === 'message') {
+    if (MESSAGE_LIKE_HEADERS.has(lowered)) {
       colDef.cellRenderer = MessagePreviewRenderer
       colDef.minWidth = 300
       colDef.flex = 1
-    }
-
-    if (metadata.format === 'filesystem' && header === 'File Name') {
+    } else if (WIDE_HEADERS.has(lowered)) {
       colDef.minWidth = 300
       colDef.flex = 1
+    }
+
+    if (isDatetimeHeader(header)) {
+      colDef.valueFormatter = (params) => getDatetimeFormatter()(String(params.value ?? ''))
     }
 
     return colDef
   })
+
+  if (!hasTagColumn) {
+    // TLE-style synthetic Tag column so every file supports tagging.
+    defs.push({
+      headerName: 'Tag',
+      field: 'tagged',
+      width: 60,
+      minWidth: 60,
+      pinned: 'right',
+      cellRenderer: TagCheckboxRenderer,
+      cellRendererParams: { onToggle: onTagToggle },
+      valueGetter: (params) => params.data?.tagged ?? false
+    })
+  }
+
+  return defs
 }
 
 export function rowToGridRecord(
@@ -124,29 +182,39 @@ export function rowToGridRecord(
     matched
   }
 
-  headers.forEach((header, index) => {
-    const field = fieldNameFromHeader(header)
+  const fields = fieldsFromHeaders(headers)
+  fields.forEach((field, index) => {
     record[field] = cells[index] ?? ''
   })
 
   return record
 }
 
-export function getRowStyle(params: RowClassParams<GridRowRecord>): RowStyle | undefined {
-  if (params.data?.tagged) {
-    return { backgroundColor: '#fff3cd' }
+export function createRowStyleFn(
+  metadata: FileMetadata
+): (params: RowClassParams<GridRowRecord>) => RowStyle | undefined {
+  const fields = fieldsFromHeaders(metadata.headers)
+
+  return (params) => {
+    if (params.data?.tagged) {
+      return { backgroundColor: '#fff3cd' }
+    }
+    if (params.data?.matched) {
+      return { backgroundColor: '#d1ecf1' }
+    }
+    if (params.data) {
+      return evaluateColorRules(metadata.headers, fields, params.data)
+    }
+    return undefined
   }
-  if (params.data?.matched) {
-    return { backgroundColor: '#d1ecf1' }
-  }
-  return undefined
 }
 
 export function createGridOptions(
   metadata: FileMetadata,
   onTagToggle: (rowIndex: number, tagged: boolean) => void,
   onCellDoubleClicked: GridOptions<GridRowRecord>['onCellDoubleClicked'],
-  rowModelType: 'clientSide' | 'infinite' = 'infinite'
+  rowModelType: 'clientSide' | 'infinite' = 'infinite',
+  fontSize = 13
 ): GridOptions<GridRowRecord> {
   const base: GridOptions<GridRowRecord> = {
     theme: themeQuartz,
@@ -157,11 +225,11 @@ export function createGridOptions(
       sortable: false,
       filter: false
     },
-    rowHeight: 22,
-    headerHeight: 28,
+    rowHeight: rowHeightForFont(fontSize),
+    headerHeight: headerHeightForFont(fontSize),
     suppressCellFocus: false,
     onCellDoubleClicked,
-    getRowStyle
+    getRowStyle: createRowStyleFn(metadata)
   }
 
   if (rowModelType === 'infinite') {
@@ -174,4 +242,12 @@ export function createGridOptions(
   }
 
   return base
+}
+
+export function rowHeightForFont(fontSize: number): number {
+  return Math.max(18, Math.round(fontSize * 1.7))
+}
+
+export function headerHeightForFont(fontSize: number): number {
+  return Math.max(24, Math.round(fontSize * 2.1))
 }

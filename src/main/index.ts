@@ -1,9 +1,10 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
-import { app, BrowserWindow, ipcMain, Menu, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from 'electron'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { hasUnsavedTags, closeAllSessions } from './fileSession'
 import { pickAndOpenFile, registerIpcHandlers } from './ipcHandlers'
+import { setCommandContext, ensureColorRulesFile } from './commands'
 import { applyLinuxGpuCompat } from './linuxGpuCompat'
 import { resolvePreloadPath } from './paths'
 import { debugLog, errorLog } from './debugLog'
@@ -179,6 +180,33 @@ function buildMenu(): void {
           label: 'Reset Font Size',
           accelerator: 'Ctrl+0',
           click: () => mainWindow?.webContents.send('menu:reset-font')
+        },
+        { type: 'separator' },
+        {
+          label: 'Date/Time Format',
+          submenu: [
+            {
+              label: 'ISO (YYYY-MM-DDTHH:MM:SS)',
+              type: 'radio',
+              checked: true,
+              click: () => mainWindow?.webContents.send('menu:datetime-iso')
+            },
+            {
+              label: 'ISO with sub-seconds (nanosecond padding)',
+              type: 'radio',
+              click: () => mainWindow?.webContents.send('menu:datetime-subseconds')
+            },
+            {
+              label: 'Original file values',
+              type: 'radio',
+              click: () => mainWindow?.webContents.send('menu:datetime-original')
+            }
+          ]
+        },
+        { type: 'separator' },
+        {
+          label: 'Reload Colour Rules',
+          click: () => mainWindow?.webContents.send('menu:reload-color-rules')
         }
       ]
     },
@@ -191,7 +219,8 @@ function buildMenu(): void {
           click: () => mainWindow?.webContents.send('menu:search-current')
         },
         {
-          label: 'Search in All Tabs…',
+          label: 'Find in All Files…',
+          accelerator: 'Ctrl+Shift+F',
           click: () => mainWindow?.webContents.send('menu:search-all')
         },
         {
@@ -221,6 +250,19 @@ app.whenReady().then(() => {
     display: process.env.DISPLAY,
     userData: app.getPath('userData')
   })
+
+  setCommandContext({
+    sendEvent: (channel, payload) => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send(channel, payload)
+      }
+    },
+    showError: (title, message) => {
+      dialog.showErrorBox(title, message)
+    }
+  })
+
+  ensureColorRulesFile()
 
   registerIpcHandlers(getMainWindow, () => {
     allowClose = true

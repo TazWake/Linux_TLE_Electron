@@ -1,8 +1,15 @@
 export const FILESYSTEM_HEADER =
   'Date,Size,Type,Mode,UID,GID,Meta,File Name'
 
+/** Default psort dynamic output header (kept for reference and tests). */
 export const SUPER_HEADER =
   'datetime,timestamp_desc,source,source_long,message,parser,display_name,tag'
+
+/**
+ * A CSV is treated as a Plaso super timeline when its header contains all of
+ * these columns, regardless of order or any extra dynamic columns.
+ */
+export const SUPER_CORE_COLUMNS = ['datetime', 'timestamp_desc', 'source', 'message']
 
 export const MAX_FILE_BYTES = 2 * 1024 * 1024 * 1024
 export const MAX_ROW_COUNT = 10_000_000

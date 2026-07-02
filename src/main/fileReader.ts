@@ -1,5 +1,6 @@
 import fs from 'fs'
 import { parseCsvLine } from '../shared/csv'
+import { flexColumnIndex } from '../shared/formatDetection'
 import { errorLog } from './debugLog'
 import type { RowData } from '../shared/types'
 import type { FileSession } from './fileSession'
@@ -47,6 +48,7 @@ export function readRows(
   const rows: RowData[] = []
   const exclusiveEnd = Math.min(endRow, rowIndexMap ? rowIndexMap.length : session.rowCount)
   const expectedColumnCount = session.headers.length
+  const flexIndex = flexColumnIndex(session.headers)
 
   for (let virtualRow = startRow; virtualRow < exclusiveEnd; virtualRow++) {
     const dataRowIndex = rowIndexMap ? rowIndexMap[virtualRow] : virtualRow
@@ -62,7 +64,7 @@ export function readRows(
 
     try {
       const line = readLineAtOffset(session.fd, offset)
-      const cells = parseCsvLine(line, expectedColumnCount)
+      const cells = parseCsvLine(line, expectedColumnCount, flexIndex)
 
       rows.push({
         rowIndex: dataRowIndex,

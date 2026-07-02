@@ -24,6 +24,10 @@ export function setSession(session: FileSession): void {
   sessions.set(session.fileId, session)
 }
 
+export function getAllSessions(): FileSession[] {
+  return [...sessions.values()]
+}
+
 export function deleteSession(fileId: string): FileSession | undefined {
   const session = sessions.get(fileId)
   if (session) {

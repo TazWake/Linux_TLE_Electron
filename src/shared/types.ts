@@ -1,4 +1,4 @@
-export type TimelineFormat = 'filesystem' | 'super'
+export type TimelineFormat = 'filesystem' | 'super' | 'generic'
 
 export interface FileMetadata {
   fileId: string

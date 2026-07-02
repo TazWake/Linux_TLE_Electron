@@ -55,14 +55,30 @@ export interface IndexCompleteEvent {
   rowCount: number
 }
 
+export interface FileSearchSummary {
+  fileId: string
+  fileName: string
+  matchCount: number
+  matchingRowIndices: number[]
+}
+
+export interface CommandResult<T> {
+  ok: boolean
+  result?: T
+  error?: string
+}
+
 export interface ElectronApi {
   openFile: () => Promise<FileMetadata | null>
   openFilePath: (filePath: string) => Promise<FileMetadata | null>
   getRows: (range: RowRange) => Promise<RowData[]>
   search: (request: SearchRequest) => Promise<SearchResult>
+  searchAll: (term: string) => Promise<FileSearchSummary[]>
   tagUpdate: (update: TagUpdate) => Promise<void>
   saveTags: (request: SaveTagsRequest) => Promise<boolean>
   closeFile: (fileId: string) => Promise<void>
+  loadColorRules: () => Promise<string | null>
+  invokeCommand: (name: string, payload?: unknown) => Promise<CommandResult<unknown>>
   onIndexProgress: (callback: (event: IndexProgressEvent) => void) => () => void
   onIndexComplete: (callback: (event: IndexCompleteEvent) => void) => () => void
   onIndexFailed: (callback: (event: { fileId: string }) => void) => () => void
@@ -81,9 +97,13 @@ const api: ElectronApi = {
   openFilePath: (filePath: string) => ipcRenderer.invoke('file:open-path', filePath),
   getRows: (range: RowRange) => ipcRenderer.invoke('file:get-rows', range),
   search: (request: SearchRequest) => ipcRenderer.invoke('file:search', request),
+  searchAll: (term: string) => ipcRenderer.invoke('search:all', term),
   tagUpdate: (update: TagUpdate) => ipcRenderer.invoke('file:tag-update', update),
   saveTags: (request: SaveTagsRequest) => ipcRenderer.invoke('file:save-tags', request),
   closeFile: (fileId: string) => ipcRenderer.invoke('file:close', fileId),
+  loadColorRules: () => ipcRenderer.invoke('rules:load'),
+  invokeCommand: (name: string, payload?: unknown) =>
+    ipcRenderer.invoke('command:invoke', name, payload),
   onIndexProgress: (callback) => {
     const handler = (_event: Electron.IpcRendererEvent, data: IndexProgressEvent): void => {
       callback(data)
@@ -155,7 +175,11 @@ const api: ElectronApi = {
       'menu:reset-font',
       'menu:search-current',
       'menu:search-all',
-      'menu:clear-search'
+      'menu:clear-search',
+      'menu:reload-color-rules',
+      'menu:datetime-iso',
+      'menu:datetime-subseconds',
+      'menu:datetime-original'
     ] as const
 
     for (const channel of channels) {
